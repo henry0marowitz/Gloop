@@ -15,7 +15,7 @@ interface User {
 
 interface SearchUsersProps {
   users: User[]
-  onUserClick: () => void
+  onUserClick: (userId: string) => void
 }
 
 export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
@@ -38,8 +38,8 @@ export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
   }
 
   const handleGloopUser = async (user: User) => {
-    // Immediately trigger refresh for instant UI update
-    onUserClick()
+    // Immediately update UI
+    onUserClick(user.id)
     
     try {
       const { error: gloopError } = await supabase
@@ -61,12 +61,10 @@ export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
 
       if (updateError) throw updateError
 
-      // Refresh again to ensure data consistency
-      onUserClick()
     } catch (error) {
       console.error('Error glooping user:', error)
-      // Refresh on error to revert any optimistic updates
-      onUserClick()
+      // On error, revert the optimistic update by fetching fresh data
+      window.location.reload()
     }
   }
 

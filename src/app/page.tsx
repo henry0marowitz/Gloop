@@ -41,6 +41,20 @@ export default function Home() {
     }
   }
 
+  const updateUserOptimistically = (userId: string) => {
+    setUsers(prevUsers => 
+      prevUsers.map(user => 
+        user.id === userId 
+          ? { 
+              ...user, 
+              gloop_count: user.gloop_count + 1,
+              daily_gloop_count: user.daily_gloop_count + 1
+            }
+          : user
+      )
+    )
+  }
+
   return (
     <div className="min-h-screen bg-white text-black">
       {/* Header */}
@@ -64,7 +78,7 @@ export default function Home() {
               title="Global Glooperboard" 
               users={users} 
               type="global"
-              onUserClick={fetchUsers}
+              onUserClick={updateUserOptimistically}
             />
           </div>
 
@@ -78,7 +92,7 @@ export default function Home() {
                 return today.toDateString() === lastReset.toDateString()
               })} 
               type="daily"
-              onUserClick={fetchUsers}
+              onUserClick={updateUserOptimistically}
             />
           </div>
 
