@@ -72,7 +72,7 @@ export default function Home() {
     
     if (data) {
       // NEVER allow counts to go backwards - always use the maximum value
-      setUsers(prevUsers => {
+      setUsers((prevUsers: any[]) => {
         return data.map(serverUser => {
           const currentUser = prevUsers.find(u => u.id === serverUser.id)
           
@@ -119,7 +119,7 @@ export default function Home() {
       const increment = boostActive ? 10 : 1
       
       // Update user count optimistically for instant UI feedback
-      setUsers(prevUsers => 
+      setUsers((prevUsers: any[]) => 
         prevUsers.map(u => 
           u.id === userId 
             ? { 
@@ -133,7 +133,7 @@ export default function Home() {
       
       // Update current user if it's the same person
       if (currentUser?.id === userId) {
-        setCurrentUser(prev => prev ? {
+        setCurrentUser((prev: any) => prev ? {
           ...prev,
           gloop_count: prev.gloop_count + increment,
           daily_gloop_count: prev.daily_gloop_count + increment
@@ -187,7 +187,7 @@ export default function Home() {
       } catch (error) {
         console.error('Database error:', error)
         // Revert optimistic update on error
-        setUsers(prevUsers => 
+        setUsers((prevUsers: any[]) => 
           prevUsers.map(u => 
             u.id === userId 
               ? { 
