@@ -78,8 +78,8 @@ export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
   }
 
   return (
-    <div className="bg-white border border-purple-200 rounded-lg p-4 shadow-sm">
-      <div className="mb-4">
+    <div className="relative">
+      <div>
         <input
           type="text"
           placeholder="Search for a name..."
@@ -90,49 +90,48 @@ export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
       </div>
 
       {searchResults.length > 0 && (
-        <div className="space-y-2">
-          {searchResults.map((user) => (
-            <motion.div
-              key={user.id}
-              className="flex items-center justify-between p-3 hover:bg-purple-50 rounded-lg transition-colors"
-              whileHover={{ scale: 1.02 }}
-              transition={{ duration: 0.1 }}
-            >
-              <motion.button
-                onClick={() => handleGloopUser(user)}
-                className="text-left flex-1 hover:bg-purple-100 p-2 rounded transition-all shadow-sm hover:shadow-md"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+        <div className="absolute top-full left-0 right-0 bg-white border border-purple-200 rounded-lg shadow-lg z-50 mt-1">
+          <div className="space-y-2 p-3">
+            {searchResults.map((user) => (
+              <motion.div
+                key={user.id}
+                className="flex items-center justify-between p-3 hover:bg-purple-50 rounded-lg transition-colors"
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.1 }}
               >
-                <span className="font-medium text-gray-900">
-                  {user.first_name} {user.last_name}
-                </span>
-              </motion.button>
-              
-              <div className="flex items-center gap-2">
-                <motion.span 
-                  className="text-lg font-bold text-purple-600"
-                  key={user.gloop_count}
-                  initial={{ scale: 1.2, color: '#7c3aed' }}
-                  animate={{ scale: 1, color: '#7c3aed' }}
-                  transition={{ duration: 0.3, type: 'spring' }}
+                <motion.button
+                  onClick={() => handleGloopUser(user)}
+                  className="text-left flex-1 hover:bg-purple-100 p-2 rounded transition-all shadow-sm hover:shadow-md"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  {user.gloop_count}
-                </motion.span>
-                {user.gloop_boosts > 0 && (
-                  <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium">
-                    {user.gloop_boosts}x
+                  <span className="font-medium text-gray-900">
+                    {user.first_name} {user.last_name}
                   </span>
-                )}
-              </div>
-            </motion.div>
-          ))}
+                </motion.button>
+                
+                <div className="flex items-center gap-2">
+                  <motion.span 
+                    className="text-lg font-bold text-purple-600"
+                    key={user.gloop_count}
+                    initial={{ scale: 1.2, color: '#7c3aed' }}
+                    animate={{ scale: 1, color: '#7c3aed' }}
+                    transition={{ duration: 0.3, type: 'spring' }}
+                  >
+                    {user.gloop_count}
+                  </motion.span>
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
       )}
 
       {searchTerm && searchResults.length === 0 && (
-        <div className="text-center py-4 text-gray-500">
-          No users found matching "{searchTerm}"
+        <div className="absolute top-full left-0 right-0 bg-white border border-purple-200 rounded-lg shadow-lg z-50 mt-1">
+          <div className="text-center py-4 text-gray-500">
+            No users found matching "{searchTerm}"
+          </div>
         </div>
       )}
     </div>

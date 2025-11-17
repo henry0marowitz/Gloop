@@ -59,11 +59,6 @@ export default function Recents({ recentGloops, onUserClick }: RecentsProps) {
                 >
                   {user.gloop_count}
                 </motion.span>
-                {user.gloop_boosts > 0 && (
-                  <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium">
-                    {user.gloop_boosts}x boost
-                  </span>
-                )}
               </div>
             </motion.div>
           ))

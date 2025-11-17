@@ -16,6 +16,8 @@ export default function Home() {
   const [showSignupModal, setShowSignupModal] = useState(false)
   const [recentGloops, setRecentGloops] = useState<any[]>([])
   const [pendingGloops, setPendingGloops] = useState<Record<string, number>>({})
+  const [boostActive, setBoostActive] = useState(false)
+  const [boostTimeLeft, setBoostTimeLeft] = useState(0)
 
   useEffect(() => {
     fetchUsers()
@@ -26,6 +28,26 @@ export default function Home() {
     
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null
+    
+    if (boostActive && boostTimeLeft > 0) {
+      timer = setInterval(() => {
+        setBoostTimeLeft(prev => {
+          if (prev <= 1) {
+            setBoostActive(false)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    }
+    
+    return () => {
+      if (timer) clearInterval(timer)
+    }
+  }, [boostActive, boostTimeLeft])
 
   useEffect(() => {
     checkCurrentUser()
@@ -106,14 +128,15 @@ export default function Home() {
 
     const user = users.find(u => u.id === userId)
     if (user) {
+      const increment = boostActive ? 10 : 1
       // Update user count optimistically
       setUsers(prevUsers => 
         prevUsers.map(u => 
           u.id === userId 
             ? { 
                 ...u, 
-                gloop_count: u.gloop_count + 1,
-                daily_gloop_count: u.daily_gloop_count + 1
+                gloop_count: u.gloop_count + increment,
+                daily_gloop_count: u.daily_gloop_count + increment
               }
             : u
         )
@@ -123,8 +146,8 @@ export default function Home() {
       if (currentUser?.id === userId) {
         setCurrentUser(prev => prev ? {
           ...prev,
-          gloop_count: prev.gloop_count + 1,
-          daily_gloop_count: prev.daily_gloop_count + 1
+          gloop_count: prev.gloop_count + increment,
+          daily_gloop_count: prev.daily_gloop_count + increment
         } : null)
       }
 
@@ -142,8 +165,28 @@ export default function Home() {
     }
   }
 
+  const activateBoost = () => {
+    if (currentUser && currentUser.gloop_boosts > 0) {
+      setBoostActive(true)
+      setBoostTimeLeft(60) // 60 seconds
+      
+      // Decrease boost count
+      setCurrentUser(prev => prev ? {
+        ...prev,
+        gloop_boosts: prev.gloop_boosts - 1
+      } : null)
+      
+      // Update in database
+      supabase
+        .from('users')
+        .update({ gloop_boosts: currentUser.gloop_boosts - 1 })
+        .eq('id', currentUser.id)
+        .then(() => fetchUsers())
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-white text-black">
+    <div className={`min-h-screen bg-white text-black ${boostActive ? 'shadow-[0_0_50px_rgba(168,85,247,0.4)]' : ''}`}>
       {/* Header */}
       <header className="py-8 px-4">
         <div className="flex flex-col lg:flex-row items-center gap-6">
@@ -210,7 +253,7 @@ export default function Home() {
             <>
               {/* User Profile - Takes up most space */}
               <div className="w-full sm:flex-1 order-2 sm:order-1">
-                <UserProfile user={currentUser} onSelfGloop={updateUserOptimistically} />
+                <UserProfile user={currentUser} onSelfGloop={updateUserOptimistically} onActivateBoost={activateBoost} />
               </div>
 
               {/* Invite Button - Smaller on right */}
@@ -239,6 +282,17 @@ export default function Home() {
             </>
           )}
         </div>
+        
+        {/* Boost Timer */}
+        {boostActive && (
+          <div className="fixed bottom-1/2 left-1/2 transform -translate-x-1/2 translate-y-1/2 bg-purple-600 text-white px-6 py-3 rounded-full shadow-lg z-50">
+            <div className="text-center">
+              <div className="text-2xl font-bold">🚀 BOOST ACTIVE</div>
+              <div className="text-lg">10x multiplier</div>
+              <div className="text-lg">{Math.floor(boostTimeLeft / 60)}:{(boostTimeLeft % 60).toString().padStart(2, '0')}</div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Signup Modal */}

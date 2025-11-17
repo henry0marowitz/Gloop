@@ -14,9 +14,10 @@ interface User {
 interface UserProfileProps {
   user: User
   onSelfGloop: (userId: string) => void
+  onActivateBoost?: () => void
 }
 
-export default function UserProfile({ user, onSelfGloop }: UserProfileProps) {
+export default function UserProfile({ user, onSelfGloop, onActivateBoost }: UserProfileProps) {
   return (
     <motion.button
       onClick={() => onSelfGloop(user.id)}
@@ -36,9 +37,17 @@ export default function UserProfile({ user, onSelfGloop }: UserProfileProps) {
             <span>Gloops: <strong className="text-purple-600">{user.gloop_count}</strong></span>
             <span>Today: <strong className="text-purple-600">{user.daily_gloop_count}</strong></span>
             {user.gloop_boosts > 0 && (
-              <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+              <motion.button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onActivateBoost && onActivateBoost()
+                }}
+                className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium hover:bg-yellow-200 transition-colors cursor-pointer"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
                 {user.gloop_boosts} boosts
-              </span>
+              </motion.button>
             )}
           </div>
         </div>
