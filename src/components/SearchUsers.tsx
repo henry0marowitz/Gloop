@@ -47,41 +47,6 @@ export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
   const handleGloopUser = async (user: User) => {
     // Immediately update UI - allow unlimited fast clicking
     onUserClick(user.id)
-    
-    try {
-      // Just insert the gloop - let the database handle counting
-      const { error: gloopError } = await supabase
-        .from('gloops')
-        .insert({ user_id: user.id })
-
-      if (gloopError) throw gloopError
-
-      // Update count using database function for atomic increment
-      const { error: updateError } = await supabase
-        .rpc('increment_gloop_count', { user_id: user.id })
-
-      if (updateError) {
-        // Fallback to manual update if RPC doesn't exist
-        const { data: userData } = await supabase
-          .from('users')
-          .select('gloop_count, daily_gloop_count')
-          .eq('id', user.id)
-          .single()
-
-        if (userData) {
-          await supabase
-            .from('users')
-            .update({ 
-              gloop_count: userData.gloop_count + 1,
-              daily_gloop_count: userData.daily_gloop_count + 1
-            })
-            .eq('id', user.id)
-        }
-      }
-
-    } catch (error) {
-      console.error('Error glooping user:', error)
-    }
   }
 
   return (

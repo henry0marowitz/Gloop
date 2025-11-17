@@ -119,17 +119,12 @@ export default function Home() {
     }
   }
 
-  const updateUserOptimistically = (userId: string) => {
-    // Track pending gloop for this user
-    setPendingGloops(prev => ({
-      ...prev,
-      [userId]: (prev[userId] || 0) + 1
-    }))
-
+  const updateUserOptimistically = async (userId: string) => {
     const user = users.find(u => u.id === userId)
     if (user) {
       const increment = boostActive ? 10 : 1
-      // Update user count optimistically
+      
+      // Update user count optimistically for instant UI feedback
       setUsers(prevUsers => 
         prevUsers.map(u => 
           u.id === userId 
@@ -151,7 +146,7 @@ export default function Home() {
         } : null)
       }
 
-      // Add to recent gloops after state update
+      // Add to recent gloops
       setTimeout(() => {
         const updatedUser = users.find(u => u.id === userId)
         if (updatedUser) {
@@ -162,6 +157,29 @@ export default function Home() {
           })
         }
       }, 0)
+
+      // Perform database operation
+      try {
+        if (boostActive) {
+          await supabase.rpc('increment_user_gloop_boost', { user_id: userId })
+        } else {
+          await supabase.rpc('increment_user_gloop', { user_id: userId, increment_amount: 1 })
+        }
+      } catch (error) {
+        console.error('Database error:', error)
+        // Revert optimistic update on error
+        setUsers(prevUsers => 
+          prevUsers.map(u => 
+            u.id === userId 
+              ? { 
+                  ...u, 
+                  gloop_count: u.gloop_count - increment,
+                  daily_gloop_count: u.daily_gloop_count - increment
+                }
+              : u
+          )
+        )
+      }
     }
   }
 

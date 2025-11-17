@@ -26,36 +26,34 @@ export default function GlooperBoard({ title, users, type, onUserClick }: Gloope
     onUserClick(user.id)
     
     try {
-      // Just insert the gloop - let the database handle counting
-      const { error: gloopError } = await supabase
-        .from('gloops')
-        .insert({ user_id: user.id })
+      // Use upsert for atomic operation to ensure each click is counted
+      const { error } = await supabase
+        .rpc('increment_user_gloop', { 
+          user_id: user.id,
+          increment_amount: 1 
+        })
 
-      if (gloopError) throw gloopError
-
-      // Update count using database function for atomic increment
-      const { error: updateError } = await supabase
-        .rpc('increment_gloop_count', { user_id: user.id })
-
-      if (updateError) {
-        // Fallback to manual update if RPC doesn't exist
-        const { data: userData } = await supabase
+      if (error) {
+        console.error('Error incrementing gloop:', error)
+        // Fallback: insert gloop record and manual count update
+        await supabase.from('gloops').insert({ user_id: user.id })
+        
+        const { data: currentUser } = await supabase
           .from('users')
           .select('gloop_count, daily_gloop_count')
           .eq('id', user.id)
           .single()
-
-        if (userData) {
+        
+        if (currentUser) {
           await supabase
             .from('users')
-            .update({ 
-              gloop_count: userData.gloop_count + 1,
-              daily_gloop_count: userData.daily_gloop_count + 1
+            .update({
+              gloop_count: currentUser.gloop_count + 1,
+              daily_gloop_count: currentUser.daily_gloop_count + 1
             })
             .eq('id', user.id)
         }
       }
-
     } catch (error) {
       console.error('Error glooping user:', error)
     }
