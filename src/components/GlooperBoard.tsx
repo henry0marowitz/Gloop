@@ -21,6 +21,9 @@ interface GlooperBoardProps {
 
 export default function GlooperBoard({ title, users, type, onUserClick }: GlooperBoardProps) {
   const handleGloopUser = async (user: User) => {
+    // Immediately trigger refresh for instant UI update
+    onUserClick()
+    
     try {
       const { error: gloopError } = await supabase
         .from('gloops')
@@ -41,9 +44,12 @@ export default function GlooperBoard({ title, users, type, onUserClick }: Gloope
 
       if (updateError) throw updateError
 
+      // Refresh again to ensure data consistency
       onUserClick()
     } catch (error) {
       console.error('Error glooping user:', error)
+      // Refresh on error to revert any optimistic updates
+      onUserClick()
     }
   }
 

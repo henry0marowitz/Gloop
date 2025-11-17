@@ -38,6 +38,9 @@ export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
   }
 
   const handleGloopUser = async (user: User) => {
+    // Immediately trigger refresh for instant UI update
+    onUserClick()
+    
     try {
       const { error: gloopError } = await supabase
         .from('gloops')
@@ -58,9 +61,12 @@ export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
 
       if (updateError) throw updateError
 
+      // Refresh again to ensure data consistency
       onUserClick()
     } catch (error) {
       console.error('Error glooping user:', error)
+      // Refresh on error to revert any optimistic updates
+      onUserClick()
     }
   }
 
