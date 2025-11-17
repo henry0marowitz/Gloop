@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 
@@ -36,6 +36,13 @@ export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
     
     setSearchResults(filtered.slice(0, 10))
   }
+
+  // Update search results whenever users data changes
+  React.useEffect(() => {
+    if (searchTerm.trim() !== '') {
+      handleSearch(searchTerm)
+    }
+  }, [users])
 
   const handleGloopUser = async (user: User) => {
     // Immediately update UI - allow unlimited fast clicking
