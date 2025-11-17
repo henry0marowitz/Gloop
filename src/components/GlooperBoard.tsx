@@ -21,47 +21,43 @@ interface GlooperBoardProps {
 }
 
 export default function GlooperBoard({ title, users, type, onUserClick }: GlooperBoardProps) {
-  const [clicking, setClicking] = useState<Record<string, boolean>>({})
-
   const handleGloopUser = async (user: User) => {
-    // Prevent multiple rapid clicks on the same user
-    if (clicking[user.id]) return
-    
-    setClicking(prev => ({ ...prev, [user.id]: true }))
-    
-    // Immediately update UI
+    // Immediately update UI - allow unlimited fast clicking
     onUserClick(user.id)
     
     try {
-      // Add gloop entry and update user count in parallel
-      const [gloopResult, userResult] = await Promise.all([
-        supabase.from('gloops').insert({ user_id: user.id }),
-        supabase.from('users').select('gloop_count, daily_gloop_count').eq('id', user.id).single()
-      ])
+      // Just insert the gloop - let the database handle counting
+      const { error: gloopError } = await supabase
+        .from('gloops')
+        .insert({ user_id: user.id })
 
-      if (gloopResult.error) throw gloopResult.error
-      
-      // Get current count and increment
-      const currentData = userResult.data
-      if (currentData) {
-        const { error: updateError } = await supabase
+      if (gloopError) throw gloopError
+
+      // Update count using database function for atomic increment
+      const { error: updateError } = await supabase
+        .rpc('increment_gloop_count', { user_id: user.id })
+
+      if (updateError) {
+        // Fallback to manual update if RPC doesn't exist
+        const { data: userData } = await supabase
           .from('users')
-          .update({ 
-            gloop_count: currentData.gloop_count + 1,
-            daily_gloop_count: currentData.daily_gloop_count + 1
-          })
+          .select('gloop_count, daily_gloop_count')
           .eq('id', user.id)
+          .single()
 
-        if (updateError) throw updateError
+        if (userData) {
+          await supabase
+            .from('users')
+            .update({ 
+              gloop_count: userData.gloop_count + 1,
+              daily_gloop_count: userData.daily_gloop_count + 1
+            })
+            .eq('id', user.id)
+        }
       }
 
     } catch (error) {
       console.error('Error glooping user:', error)
-    } finally {
-      // Re-enable clicking after a short delay
-      setTimeout(() => {
-        setClicking(prev => ({ ...prev, [user.id]: false }))
-      }, 500)
     }
   }
 
