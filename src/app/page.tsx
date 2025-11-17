@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-export const dynamic = 'force-dynamic'
 import { supabase } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import GlooperBoard from '@/components/GlooperBoard'
@@ -133,3 +132,5 @@ export default function Home() {
     </div>
   )
 }
+
+export const dynamic = 'force-dynamic'
