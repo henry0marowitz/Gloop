@@ -59,16 +59,16 @@ export default function InviteButton({ currentUser, onSignupRequired }: InviteBu
     <div className="text-center w-full">
       <motion.button
         onClick={handleInviteClick}
-        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-8 text-2xl rounded-full font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
+        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-4 lg:px-8 lg:py-8 text-lg lg:text-2xl rounded-full font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
       >
         Invite friends to get a Gloop Boost!
       </motion.button>
       
-      <div className="mt-2">
+      <div className="mt-1 lg:mt-2">
         <motion.div
-          className="text-sm sm:text-lg md:text-xl font-bold text-yellow-600"
+          className="text-xs lg:text-sm xl:text-lg font-bold text-yellow-600"
           animate={{ scale: [1, 1.1, 1] }}
           transition={{ duration: 2, repeat: Infinity }}
         >

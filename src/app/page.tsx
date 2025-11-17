@@ -242,8 +242,48 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 pb-48">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <main className="max-w-7xl mx-auto px-4 pb-32">
+        {/* Mobile Layout */}
+        <div className="block lg:hidden">
+          {/* Global Leaderboard - Top on mobile */}
+          <div className="mb-8">
+            <GlooperBoard 
+              title="Global Glooperboard" 
+              users={users} 
+              type="global"
+              onUserClick={updateUserOptimistically}
+            />
+          </div>
+          
+          {/* Daily Leaderboard - Middle on mobile */}
+          <div className="mb-8">
+            <GlooperBoard 
+              title="Daily Glooperboard" 
+              users={users.filter(u => {
+                const today = new Date()
+                const lastReset = new Date(u.last_daily_reset)
+                return today.toDateString() === lastReset.toDateString()
+              })} 
+              type="daily"
+              onUserClick={updateUserOptimistically}
+            />
+          </div>
+
+          {/* Recents - Bottom on mobile */}
+          <div className="mb-8">
+            <Recents 
+              recentGloops={recentGloops.map(recentUser => {
+                // Find the current data for this user to show updated counts
+                const currentUser = users.find(u => u.id === recentUser.id)
+                return currentUser || recentUser
+              })} 
+              onUserClick={updateUserOptimistically} 
+            />
+          </div>
+        </div>
+
+        {/* Desktop Layout */}
+        <div className="hidden lg:grid lg:grid-cols-3 gap-8">
           {/* Left Side - Global Leaderboard */}
           <div>
             <GlooperBoard 
@@ -269,7 +309,7 @@ export default function Home() {
           </div>
 
           {/* Right Side - Recents */}
-          <div className="lg:order-none order-first lg:order-last">
+          <div>
             <Recents 
               recentGloops={recentGloops.map(recentUser => {
                 // Find the current data for this user to show updated counts
@@ -283,9 +323,9 @@ export default function Home() {
       </main>
 
       {/* Bottom Section - Full width buttons */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-12">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 lg:p-12">
         {/* Full width container - no max-width */}
-        <div className="flex flex-col sm:flex-row gap-8">
+        <div className="flex flex-col sm:flex-row gap-4 lg:gap-8">
           {currentUser ? (
             <>
               {/* User Profile - Takes up most space */}
@@ -310,7 +350,7 @@ export default function Home() {
               <div className="w-full sm:w-1/2 order-2 sm:order-1">
                 <motion.button
                   onClick={() => setShowSignupModal(true)}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white px-8 py-8 text-3xl rounded-full font-semibold transition-all shadow-lg hover:shadow-xl"
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-4 lg:px-8 lg:py-8 text-lg lg:text-3xl rounded-full font-semibold transition-all shadow-lg hover:shadow-xl"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
