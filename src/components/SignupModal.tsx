@@ -19,6 +19,57 @@ export default function SignupModal({ onClose, onSignup }: SignupModalProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const rewardInviteBoostIfNeeded = async () => {
+    if (typeof window === 'undefined') return
+    const pendingInvite = localStorage.getItem('gloop-pending-invite')
+    if (!pendingInvite) return
+
+    try {
+      const inviteData = JSON.parse(pendingInvite) as { code: string; inviterId: string }
+      if (!inviteData?.code) {
+        localStorage.removeItem('gloop-pending-invite')
+        return
+      }
+
+      const { data: inviteLink, error: inviteFetchError } = await supabase
+        .from('invite_links')
+        .select('*')
+        .eq('code', inviteData.code)
+        .single()
+
+      if (inviteFetchError || !inviteLink) {
+        localStorage.removeItem('gloop-pending-invite')
+        return
+      }
+
+      const { data: inviter, error: inviterError } = await supabase
+        .from('users')
+        .select('gloop_boosts')
+        .eq('id', inviteLink.user_id)
+        .single()
+
+      if (inviterError || !inviter) {
+        localStorage.removeItem('gloop-pending-invite')
+        return
+      }
+
+      await supabase
+        .from('users')
+        .update({ gloop_boosts: inviter.gloop_boosts + 1 })
+        .eq('id', inviteLink.user_id)
+
+      await supabase
+        .from('invite_links')
+        .update({ uses: inviteLink.uses + 1 })
+        .eq('id', inviteLink.id)
+
+      localStorage.removeItem('gloop-pending-invite')
+    } catch (inviteError) {
+      console.error('Error rewarding invite boost:', inviteError)
+      localStorage.removeItem('gloop-pending-invite')
+    }
+  }
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
@@ -103,6 +154,7 @@ export default function SignupModal({ onClose, onSignup }: SignupModalProps) {
         }
 
         onSignup(data)
+        await rewardInviteBoostIfNeeded()
         onClose()
       }
     } catch (error) {

@@ -36,27 +36,17 @@ export default function InvitePage() {
       }
 
       setInviter(inviteLink.users)
-
-      const { error: updateError } = await supabase
-        .from('invite_links')
-        .update({ uses: inviteLink.uses + 1 })
-        .eq('id', inviteLink.id)
-
-      if (updateError) {
-        console.error('Error updating invite uses:', updateError)
+      
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(
+          'gloop-pending-invite',
+          JSON.stringify({
+            code,
+            inviterId: inviteLink.user_id,
+            inviterName: `${inviteLink.users.first_name} ${inviteLink.users.last_name}`
+          })
+        )
       }
-
-      const { error: boostError } = await supabase
-        .from('users')
-        .update({ gloop_boosts: inviteLink.users.gloop_boosts + 1 })
-        .eq('id', inviteLink.user_id)
-
-      if (boostError) {
-        console.error('Error adding gloop boost:', boostError)
-      }
-
-      // Redirect immediately instead of waiting 3 seconds
-      router.push('/')
 
     } catch (error) {
       console.error('Error processing invite:', error)
@@ -111,22 +101,27 @@ export default function InvitePage() {
           animate={{ scale: [1, 1.1, 1] }}
           transition={{ duration: 2, repeat: Infinity }}
         >
-          🎉 Gloop Boost Activated! 🎉
+          🎉 Invite Locked In! 🎉
         </motion.h1>
         
         {inviter && (
           <p className="text-xl text-gray-700 mb-4">
-            You've given {inviter.first_name} {inviter.last_name} a 10x Gloop Boost for 1 minute!
+            Sign up to give {inviter.first_name} {inviter.last_name} a 10x Gloop Boost for 1 minute!
           </p>
         )}
         
-        <motion.div
-          className="text-lg text-purple-500"
-          animate={{ opacity: [1, 0.5, 1] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
+        <p className="text-gray-600 mb-6">
+          Create your account (or sign in) from the homepage to complete the boost.
+        </p>
+
+        <motion.button
+          onClick={() => router.push('/')}
+          className="bg-purple-600 text-white px-6 py-3 rounded-full hover:bg-purple-700 transition-colors"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
         >
-          Redirecting to homepage in 3 seconds...
-        </motion.div>
+          Go to Homepage
+        </motion.button>
       </motion.div>
     </div>
   )

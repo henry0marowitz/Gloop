@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import GlooperBoard from '@/components/GlooperBoard'
@@ -18,6 +18,11 @@ export default function Home() {
   const [pendingGloops, setPendingGloops] = useState<Record<string, number>>({})
   const [boostActive, setBoostActive] = useState(false)
   const [boostTimeLeft, setBoostTimeLeft] = useState(0)
+  const currentUserRef = useRef<any>(null)
+  const lastSyncedCountsRef = useRef<{ gloop_count: number; daily_gloop_count: number }>({
+    gloop_count: 0,
+    daily_gloop_count: 0
+  })
 
   useEffect(() => {
     fetchUsers()
@@ -52,6 +57,52 @@ export default function Home() {
   useEffect(() => {
     checkCurrentUser()
   }, [users])
+
+  useEffect(() => {
+    currentUserRef.current = currentUser
+  }, [currentUser])
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      lastSyncedCountsRef.current = {
+        gloop_count: currentUser.gloop_count,
+        daily_gloop_count: currentUser.daily_gloop_count
+      }
+    }
+  }, [currentUser?.id])
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const user = currentUserRef.current
+      if (!user) return
+
+      const lastSynced = lastSyncedCountsRef.current
+      const isInSync =
+        user.gloop_count === lastSynced.gloop_count &&
+        user.daily_gloop_count === lastSynced.daily_gloop_count
+
+      if (isInSync) return
+
+      try {
+        await supabase
+          .from('users')
+          .update({
+            gloop_count: user.gloop_count,
+            daily_gloop_count: user.daily_gloop_count
+          })
+          .eq('id', user.id)
+
+        lastSyncedCountsRef.current = {
+          gloop_count: user.gloop_count,
+          daily_gloop_count: user.daily_gloop_count
+        }
+      } catch (error) {
+        console.error('Error syncing current user counts:', error)
+      }
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [])
 
   const loadRecentGloops = () => {
     try {
@@ -202,28 +253,47 @@ export default function Home() {
     }
   }
 
-  const activateBoost = () => {
-    if (currentUser && currentUser.gloop_boosts > 0) {
+  const activateBoost = async () => {
+    if (!currentUser || currentUser.gloop_boosts <= 0) return
+    
+    // Check daily boost limit
+    const dailyBoostsUsed = currentUser.daily_boosts_used || 0
+    if (dailyBoostsUsed >= 10) {
+      alert('You have reached your daily boost limit of 10. Try again tomorrow!')
+      return
+    }
+    
+    try {
+      // Reset daily boosts if needed
+      await supabase.rpc('reset_daily_boosts_if_needed', { user_id: currentUser.id })
+      
       setBoostActive(true)
       setBoostTimeLeft(60) // 60 seconds
       
-      // Decrease boost count
+      // Update user state optimistically
       setCurrentUser((prev: any) => prev ? {
         ...prev,
-        gloop_boosts: prev.gloop_boosts - 1
+        gloop_boosts: prev.gloop_boosts - 1,
+        daily_boosts_used: (prev.daily_boosts_used || 0) + 1
       } : null)
       
       // Update in database
-      supabase
+      await supabase
         .from('users')
-        .update({ gloop_boosts: currentUser.gloop_boosts - 1 })
+        .update({ 
+          gloop_boosts: currentUser.gloop_boosts - 1,
+          daily_boosts_used: dailyBoostsUsed + 1
+        })
         .eq('id', currentUser.id)
-        .then(() => fetchUsers())
+      
+      fetchUsers()
+    } catch (error) {
+      console.error('Error activating boost:', error)
     }
   }
 
   return (
-    <div className={`min-h-screen bg-white text-black ${boostActive ? 'shadow-[0_0_50px_rgba(168,85,247,0.4)]' : ''}`}>
+    <div className={`h-screen flex flex-col bg-white text-black ${boostActive ? 'shadow-[0_0_50px_rgba(168,85,247,0.4)]' : ''}`}>
       {/* Header */}
       <header className="py-8 px-4">
         <div className="flex flex-col lg:flex-row items-center gap-6">
@@ -242,7 +312,7 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 pb-32">
+      <main className="flex-1 px-4 overflow-y-auto">
         {/* Mobile Layout */}
         <div className="block lg:hidden">
           {/* Global Leaderboard - Top on mobile */}
@@ -323,7 +393,7 @@ export default function Home() {
       </main>
 
       {/* Bottom Section - Full width buttons */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 lg:p-12">
+      <div className="flex-shrink-0 bg-white border-t border-gray-200 p-4 lg:p-12">
         {/* Full width container - no max-width */}
         <div className="flex flex-col sm:flex-row gap-4 lg:gap-8">
           {currentUser ? (

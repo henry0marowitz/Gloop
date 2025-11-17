@@ -49,6 +49,13 @@ export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
     onUserClick(user.id)
   }
 
+  const handleKeyHold = (event: React.KeyboardEvent<HTMLButtonElement>, user: User) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      handleGloopUser(user)
+    }
+  }
+
   return (
     <div className="relative">
       <div>
@@ -74,6 +81,7 @@ export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
                 <div className="flex items-center gap-3">
                   <motion.button
                     onClick={() => handleGloopUser(user)}
+                    onKeyDown={(event) => handleKeyHold(event, user)}
                     className="text-left hover:bg-purple-50 px-3 py-2 rounded-lg transition-all border border-transparent hover:border-purple-200 shadow-sm hover:shadow-md"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
