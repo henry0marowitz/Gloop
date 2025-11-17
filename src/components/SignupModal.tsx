@@ -10,6 +10,7 @@ interface SignupModalProps {
 }
 
 export default function SignupModal({ onClose, onSignup }: SignupModalProps) {
+  const [isSignIn, setIsSignIn] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
     firstName: '',
@@ -25,12 +26,14 @@ export default function SignupModal({ onClose, onSignup }: SignupModalProps) {
       newErrors.email = 'Please enter a valid email address'
     }
 
-    if (formData.firstName.length < 1 || formData.firstName.length > 50) {
-      newErrors.firstName = 'First name must be 1-50 characters'
-    }
+    if (!isSignIn) {
+      if (formData.firstName.length < 1 || formData.firstName.length > 50) {
+        newErrors.firstName = 'First name must be 1-50 characters'
+      }
 
-    if (formData.lastName.length < 1 || formData.lastName.length > 50) {
-      newErrors.lastName = 'Last name must be 1-50 characters'
+      if (formData.lastName.length < 1 || formData.lastName.length > 50) {
+        newErrors.lastName = 'Last name must be 1-50 characters'
+      }
     }
 
     if (formData.email.length > 100) {
@@ -49,33 +52,51 @@ export default function SignupModal({ onClose, onSignup }: SignupModalProps) {
     setIsSubmitting(true)
 
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .insert({
-          email: formData.email.trim().toLowerCase(),
-          first_name: formData.firstName.trim(),
-          last_name: formData.lastName.trim(),
-          gloop_count: 0,
-          daily_gloop_count: 0,
-          gloop_boosts: 0
-        })
-        .select()
-        .single()
+      if (isSignIn) {
+        // Sign in with email
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', formData.email.trim().toLowerCase())
+          .single()
 
-      if (error) {
-        if (error.code === '23505') {
-          setErrors({ email: 'This email is already registered' })
-        } else {
-          throw error
+        if (error || !data) {
+          setErrors({ email: 'No account found with this email address' })
+          return
         }
-        return
-      }
 
-      onSignup(data)
-      onClose()
+        onSignup(data)
+        onClose()
+      } else {
+        // Sign up new user
+        const { data, error } = await supabase
+          .from('users')
+          .insert({
+            email: formData.email.trim().toLowerCase(),
+            first_name: formData.firstName.trim(),
+            last_name: formData.lastName.trim(),
+            gloop_count: 0,
+            daily_gloop_count: 0,
+            gloop_boosts: 0
+          })
+          .select()
+          .single()
+
+        if (error) {
+          if (error.code === '23505') {
+            setErrors({ email: 'This email is already registered. Try signing in instead.' })
+          } else {
+            throw error
+          }
+          return
+        }
+
+        onSignup(data)
+        onClose()
+      }
     } catch (error) {
-      console.error('Signup error:', error)
-      setErrors({ general: 'An error occurred during signup. Please try again.' })
+      console.error('Auth error:', error)
+      setErrors({ general: 'An error occurred. Please try again.' })
     } finally {
       setIsSubmitting(false)
     }
@@ -96,9 +117,36 @@ export default function SignupModal({ onClose, onSignup }: SignupModalProps) {
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-2xl font-bold text-purple-600 mb-6 text-center">
-          Sign Up for Gloop!
-        </h2>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-purple-600 mb-4 text-center">
+            {isSignIn ? 'Sign In to Gloop!' : 'Sign Up for Gloop!'}
+          </h2>
+          
+          <div className="flex justify-center gap-4">
+            <button
+              type="button"
+              onClick={() => setIsSignIn(false)}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                !isSignIn 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Sign Up
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsSignIn(true)}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                isSignIn 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Sign In
+            </button>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {errors.general && (
@@ -127,45 +175,49 @@ export default function SignupModal({ onClose, onSignup }: SignupModalProps) {
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              First Name *
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.firstName}
-              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                errors.firstName ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="John"
-              maxLength={50}
-            />
-            {errors.firstName && (
-              <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>
-            )}
-          </div>
+          {!isSignIn && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  First Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                    errors.firstName ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="John"
+                  maxLength={50}
+                />
+                {errors.firstName && (
+                  <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>
+                )}
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Last Name *
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.lastName}
-              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                errors.lastName ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="Doe"
-              maxLength={50}
-            />
-            {errors.lastName && (
-              <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>
-            )}
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Last Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                    errors.lastName ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="Doe"
+                  maxLength={50}
+                />
+                {errors.lastName && (
+                  <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>
+                )}
+              </div>
+            </>
+          )}
 
           <div className="flex gap-3 pt-4">
             <motion.button
@@ -184,7 +236,10 @@ export default function SignupModal({ onClose, onSignup }: SignupModalProps) {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              {isSubmitting ? 'Signing Up...' : 'Sign Up'}
+              {isSubmitting 
+                ? (isSignIn ? 'Signing In...' : 'Signing Up...') 
+                : (isSignIn ? 'Sign In' : 'Sign Up')
+              }
             </motion.button>
           </div>
         </form>

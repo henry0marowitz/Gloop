@@ -133,7 +133,14 @@ export default function Home() {
 
           {/* Right Side - Recents */}
           <div className="lg:order-none order-first lg:order-last">
-            <Recents recentGloops={recentGloops} onUserClick={updateUserOptimistically} />
+            <Recents 
+              recentGloops={recentGloops.map(recentUser => {
+                // Find the current data for this user to show updated counts
+                const currentUser = users.find(u => u.id === recentUser.id)
+                return currentUser || recentUser
+              })} 
+              onUserClick={updateUserOptimistically} 
+            />
           </div>
         </div>
       </main>
