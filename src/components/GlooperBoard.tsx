@@ -1,8 +1,6 @@
 'use client'
 
-import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { supabase } from '@/lib/supabase'
 
 interface User {
   id: string
@@ -22,41 +20,8 @@ interface GlooperBoardProps {
 
 export default function GlooperBoard({ title, users, type, onUserClick }: GlooperBoardProps) {
   const handleGloopUser = async (user: User) => {
-    // Immediately update UI - allow unlimited fast clicking
+    // Use centralized update function
     onUserClick(user.id)
-    
-    try {
-      // Use upsert for atomic operation to ensure each click is counted
-      const { error } = await supabase
-        .rpc('increment_user_gloop', { 
-          user_id: user.id,
-          increment_amount: 1 
-        })
-
-      if (error) {
-        console.error('Error incrementing gloop:', error)
-        // Fallback: insert gloop record and manual count update
-        await supabase.from('gloops').insert({ user_id: user.id })
-        
-        const { data: currentUser } = await supabase
-          .from('users')
-          .select('gloop_count, daily_gloop_count')
-          .eq('id', user.id)
-          .single()
-        
-        if (currentUser) {
-          await supabase
-            .from('users')
-            .update({
-              gloop_count: currentUser.gloop_count + 1,
-              daily_gloop_count: currentUser.daily_gloop_count + 1
-            })
-            .eq('id', user.id)
-        }
-      }
-    } catch (error) {
-      console.error('Error glooping user:', error)
-    }
   }
 
   const sortedUsers = users
