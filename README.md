@@ -64,3 +64,4 @@ A fun social media website where users can give each other "gloops" and compete 
 - **invite_links**: Manage invite codes and usage
 
 The app is designed to be simple, fun, and engaging with satisfying click animations and real-time competitive elements!
+
