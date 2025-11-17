@@ -55,9 +55,8 @@ export default function InvitePage() {
         console.error('Error adding gloop boost:', boostError)
       }
 
-      setTimeout(() => {
-        router.push('/')
-      }, 3000)
+      // Redirect immediately instead of waiting 3 seconds
+      router.push('/')
 
     } catch (error) {
       console.error('Error processing invite:', error)
