@@ -91,28 +91,29 @@ export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
 
       {searchResults.length > 0 && (
         <div className="absolute top-full left-0 right-0 bg-white border border-purple-200 rounded-lg shadow-lg z-50 mt-1">
-          <div className="space-y-2 p-3">
+          <div className="space-y-3 p-3">
             {searchResults.map((user) => (
               <motion.div
                 key={user.id}
-                className="flex items-center justify-between p-3 hover:bg-purple-50 rounded-lg transition-colors"
+                className="flex items-center justify-between"
                 whileHover={{ scale: 1.02 }}
                 transition={{ duration: 0.1 }}
               >
-                <motion.button
-                  onClick={() => handleGloopUser(user)}
-                  className="text-left flex-1 hover:bg-purple-100 p-2 rounded transition-all shadow-sm hover:shadow-md"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <span className="font-medium text-gray-900">
-                    {user.first_name} {user.last_name}
-                  </span>
-                </motion.button>
-                
+                <div className="flex items-center gap-3">
+                  <motion.button
+                    onClick={() => handleGloopUser(user)}
+                    className="text-left hover:bg-purple-50 px-3 py-2 rounded-lg transition-all border border-transparent hover:border-purple-200 shadow-sm hover:shadow-md"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <span className="font-medium text-gray-900">
+                      {user.first_name} {user.last_name}
+                    </span>
+                  </motion.button>
+                </div>
                 <div className="flex items-center gap-2">
                   <motion.span 
-                    className="text-lg font-bold text-purple-600"
+                    className="text-xl font-bold text-purple-600"
                     key={user.gloop_count}
                     initial={{ scale: 1.2, color: '#7c3aed' }}
                     animate={{ scale: 1, color: '#7c3aed' }}
