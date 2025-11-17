@@ -13,30 +13,47 @@ interface User {
 
 interface UserProfileProps {
   user: User
+  onSelfGloop: (userId: string) => void
 }
 
-export default function UserProfile({ user }: UserProfileProps) {
+export default function UserProfile({ user, onSelfGloop }: UserProfileProps) {
   return (
-    <motion.div
-      className="flex items-center gap-4"
+    <motion.button
+      onClick={() => onSelfGloop(user.id)}
+      className="w-full text-left hover:bg-purple-50 px-6 py-6 rounded-lg transition-all border border-transparent hover:border-purple-200 shadow-sm hover:shadow-md"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
     >
-      <div className="text-left">
-        <h3 className="text-2xl font-bold text-purple-600">
-          {user.first_name} {user.last_name}
-        </h3>
-        <div className="flex items-center gap-4 text-sm text-gray-600">
-          <span>Gloops: <strong className="text-purple-600">{user.gloop_count}</strong></span>
-          <span>Today: <strong className="text-purple-600">{user.daily_gloop_count}</strong></span>
-          {user.gloop_boosts > 0 && (
-            <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium">
-              {user.gloop_boosts} boosts
-            </span>
-          )}
+      <div className="flex items-center justify-between">
+        <div className="text-left">
+          <h3 className="text-3xl font-bold text-purple-600 mb-2">
+            {user.first_name} {user.last_name}
+          </h3>
+          <div className="flex items-center gap-4 text-base text-gray-600">
+            <span>Gloops: <strong className="text-purple-600">{user.gloop_count}</strong></span>
+            <span>Today: <strong className="text-purple-600">{user.daily_gloop_count}</strong></span>
+            {user.gloop_boosts > 0 && (
+              <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                {user.gloop_boosts} boosts
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <motion.span 
+            className="text-4xl font-bold text-purple-600"
+            key={user.gloop_count}
+            initial={{ scale: 1.2, color: '#7c3aed' }}
+            animate={{ scale: 1, color: '#7c3aed' }}
+            transition={{ duration: 0.3, type: 'spring' }}
+          >
+            {user.gloop_count}
+          </motion.span>
         </div>
       </div>
-    </motion.div>
+    </motion.button>
   )
 }

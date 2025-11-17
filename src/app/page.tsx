@@ -89,17 +89,17 @@ export default function Home() {
     <div className="min-h-screen bg-white text-black">
       {/* Header */}
       <header className="py-8 px-4">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-          <div className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-6">
-            <h1 className="text-6xl md:text-8xl font-bold text-purple-600">
-              Gloop
-            </h1>
-            <p className="text-xl md:text-3xl text-gray-700 text-center md:text-left">
+        <div className="flex flex-col lg:flex-row items-center gap-6">
+          <h1 className="text-6xl md:text-8xl font-bold text-purple-600">
+            Gloop
+          </h1>
+          <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-8 flex-1">
+            <p className="text-xl md:text-3xl text-gray-700 text-center lg:text-left">
               Click on a name to give them a gloop!
             </p>
-          </div>
-          <div className="w-full lg:w-auto lg:min-w-[400px]">
-            <SearchUsers users={users} onUserClick={updateUserOptimistically} />
+            <div className="w-full lg:w-auto lg:min-w-[400px]">
+              <SearchUsers users={users} onUserClick={updateUserOptimistically} />
+            </div>
           </div>
         </div>
       </header>
@@ -149,26 +149,38 @@ export default function Home() {
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-12">
         {/* Full width container - no max-width */}
         <div className="flex flex-col sm:flex-row gap-8">
-          {/* Signup or User Profile - Takes up half */}
-          <div className="w-full sm:w-1/2 order-2 sm:order-1">
-            {currentUser ? (
-              <UserProfile user={currentUser} />
-            ) : (
-              <motion.button
-                onClick={() => setShowSignupModal(true)}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white px-8 py-8 text-3xl rounded-full font-semibold transition-all shadow-lg hover:shadow-xl"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                Sign up get Gloops!
-              </motion.button>
-            )}
-          </div>
+          {currentUser ? (
+            <>
+              {/* User Profile - Takes up most space */}
+              <div className="w-full sm:flex-1 order-2 sm:order-1">
+                <UserProfile user={currentUser} onSelfGloop={updateUserOptimistically} />
+              </div>
 
-          {/* Invite Button - Takes up half */}
-          <div className="w-full sm:w-1/2 order-1 sm:order-2">
-            <InviteButton currentUser={currentUser} onSignupRequired={() => setShowSignupModal(true)} />
-          </div>
+              {/* Invite Button - Smaller on right */}
+              <div className="w-full sm:w-auto sm:flex-shrink-0 order-1 sm:order-2">
+                <InviteButton currentUser={currentUser} onSignupRequired={() => setShowSignupModal(true)} />
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Signup Button - Takes up half */}
+              <div className="w-full sm:w-1/2 order-2 sm:order-1">
+                <motion.button
+                  onClick={() => setShowSignupModal(true)}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white px-8 py-8 text-3xl rounded-full font-semibold transition-all shadow-lg hover:shadow-xl"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Sign up get Gloops!
+                </motion.button>
+              </div>
+
+              {/* Invite Button - Takes up half */}
+              <div className="w-full sm:w-1/2 order-1 sm:order-2">
+                <InviteButton currentUser={currentUser} onSignupRequired={() => setShowSignupModal(true)} />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
