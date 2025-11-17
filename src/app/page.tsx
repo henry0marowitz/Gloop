@@ -160,10 +160,35 @@ export default function Home() {
 
       // Perform database operation
       try {
+        let result
         if (boostActive) {
-          await supabase.rpc('increment_user_gloop_boost', { user_id: userId })
+          result = await supabase.rpc('increment_user_gloop_boost', { user_id: userId })
         } else {
-          await supabase.rpc('increment_user_gloop', { user_id: userId, increment_amount: 1 })
+          result = await supabase.rpc('increment_user_gloop', { user_id: userId, increment_amount: 1 })
+        }
+
+        // If RPC functions don't exist, use fallback method
+        if (result.error) {
+          console.log('Using fallback method for database update')
+          // Insert gloop record
+          await supabase.from('gloops').insert({ user_id: userId })
+          
+          // Get current user data and update counts
+          const { data: currentUserData } = await supabase
+            .from('users')
+            .select('gloop_count, daily_gloop_count')
+            .eq('id', userId)
+            .single()
+          
+          if (currentUserData) {
+            await supabase
+              .from('users')
+              .update({
+                gloop_count: currentUserData.gloop_count + increment,
+                daily_gloop_count: currentUserData.daily_gloop_count + increment
+              })
+              .eq('id', userId)
+          }
         }
       } catch (error) {
         console.error('Database error:', error)
