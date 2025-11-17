@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 
 interface User {
@@ -17,6 +18,20 @@ interface RecentsProps {
 }
 
 export default function Recents({ recentGloops, onUserClick }: RecentsProps) {
+  const [clicking, setClicking] = useState<Record<string, boolean>>({})
+
+  const handleGloopUser = (userId: string) => {
+    // Prevent multiple rapid clicks on the same user
+    if (clicking[userId]) return
+    
+    setClicking(prev => ({ ...prev, [userId]: true }))
+    onUserClick(userId)
+    
+    // Re-enable clicking after a short delay
+    setTimeout(() => {
+      setClicking(prev => ({ ...prev, [userId]: false }))
+    }, 500)
+  }
   return (
     <div className="bg-white border border-purple-200 rounded-lg p-6 shadow-sm">
       <h2 className="text-2xl font-bold text-purple-600 mb-6">Recents</h2>
@@ -34,10 +49,11 @@ export default function Recents({ recentGloops, onUserClick }: RecentsProps) {
             >
               <div className="flex items-center gap-3">
                 <motion.button
-                  onClick={() => onUserClick(user.id)}
+                  onClick={() => handleGloopUser(user.id)}
                   className="text-left hover:bg-purple-50 px-3 py-2 rounded-lg transition-all border border-transparent hover:border-purple-200 shadow-sm hover:shadow-md"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
+                  disabled={clicking[user.id]}
                 >
                   <span className="font-medium text-gray-900">
                     {user.first_name} {user.last_name}

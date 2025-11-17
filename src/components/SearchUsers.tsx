@@ -21,6 +21,7 @@ interface SearchUsersProps {
 export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [searchResults, setSearchResults] = useState<User[]>([])
+  const [clicking, setClicking] = useState<Record<string, boolean>>({})
 
   const handleSearch = (term: string) => {
     setSearchTerm(term)
@@ -38,33 +39,44 @@ export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
   }
 
   const handleGloopUser = async (user: User) => {
+    // Prevent multiple rapid clicks on the same user
+    if (clicking[user.id]) return
+    
+    setClicking(prev => ({ ...prev, [user.id]: true }))
+    
     // Immediately update UI
     onUserClick(user.id)
     
     try {
-      const { error: gloopError } = await supabase
-        .from('gloops')
-        .insert({ user_id: user.id })
+      // Add gloop entry and update user count in parallel
+      const [gloopResult, userResult] = await Promise.all([
+        supabase.from('gloops').insert({ user_id: user.id }),
+        supabase.from('users').select('gloop_count, daily_gloop_count').eq('id', user.id).single()
+      ])
 
-      if (gloopError) throw gloopError
+      if (gloopResult.error) throw gloopResult.error
+      
+      // Get current count and increment
+      const currentData = userResult.data
+      if (currentData) {
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ 
+            gloop_count: currentData.gloop_count + 1,
+            daily_gloop_count: currentData.daily_gloop_count + 1
+          })
+          .eq('id', user.id)
 
-      const newGloopCount = user.gloop_count + 1
-      const newDailyCount = user.daily_gloop_count + 1
-
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ 
-          gloop_count: newGloopCount,
-          daily_gloop_count: newDailyCount 
-        })
-        .eq('id', user.id)
-
-      if (updateError) throw updateError
+        if (updateError) throw updateError
+      }
 
     } catch (error) {
       console.error('Error glooping user:', error)
-      // On error, revert the optimistic update by fetching fresh data
-      window.location.reload()
+    } finally {
+      // Re-enable clicking after a short delay
+      setTimeout(() => {
+        setClicking(prev => ({ ...prev, [user.id]: false }))
+      }, 500)
     }
   }
 

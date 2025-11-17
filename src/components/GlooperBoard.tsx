@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 
@@ -20,34 +21,47 @@ interface GlooperBoardProps {
 }
 
 export default function GlooperBoard({ title, users, type, onUserClick }: GlooperBoardProps) {
+  const [clicking, setClicking] = useState<Record<string, boolean>>({})
+
   const handleGloopUser = async (user: User) => {
+    // Prevent multiple rapid clicks on the same user
+    if (clicking[user.id]) return
+    
+    setClicking(prev => ({ ...prev, [user.id]: true }))
+    
     // Immediately update UI
     onUserClick(user.id)
     
     try {
-      const { error: gloopError } = await supabase
-        .from('gloops')
-        .insert({ user_id: user.id })
+      // Add gloop entry and update user count in parallel
+      const [gloopResult, userResult] = await Promise.all([
+        supabase.from('gloops').insert({ user_id: user.id }),
+        supabase.from('users').select('gloop_count, daily_gloop_count').eq('id', user.id).single()
+      ])
 
-      if (gloopError) throw gloopError
+      if (gloopResult.error) throw gloopResult.error
+      
+      // Get current count and increment
+      const currentData = userResult.data
+      if (currentData) {
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ 
+            gloop_count: currentData.gloop_count + 1,
+            daily_gloop_count: currentData.daily_gloop_count + 1
+          })
+          .eq('id', user.id)
 
-      const newGloopCount = user.gloop_count + 1
-      const newDailyCount = user.daily_gloop_count + 1
-
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ 
-          gloop_count: newGloopCount,
-          daily_gloop_count: newDailyCount 
-        })
-        .eq('id', user.id)
-
-      if (updateError) throw updateError
+        if (updateError) throw updateError
+      }
 
     } catch (error) {
       console.error('Error glooping user:', error)
-      // On error, revert the optimistic update by fetching fresh data
-      window.location.reload()
+    } finally {
+      // Re-enable clicking after a short delay
+      setTimeout(() => {
+        setClicking(prev => ({ ...prev, [user.id]: false }))
+      }, 500)
     }
   }
 
@@ -79,9 +93,10 @@ export default function GlooperBoard({ title, users, type, onUserClick }: Gloope
                 </span>
                 <motion.button
                   onClick={() => handleGloopUser(user)}
-                  className="text-left hover:bg-purple-50 px-3 py-2 rounded-lg transition-all border border-transparent hover:border-purple-200 shadow-sm hover:shadow-md"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  className={`text-left hover:bg-purple-50 px-3 py-2 rounded-lg transition-all border border-transparent hover:border-purple-200 shadow-sm hover:shadow-md ${clicking[user.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  whileHover={{ scale: clicking[user.id] ? 1 : 1.05 }}
+                  whileTap={{ scale: clicking[user.id] ? 1 : 0.95 }}
+                  disabled={clicking[user.id]}
                 >
                   <span className="font-medium text-gray-900">
                     {user.first_name} {user.last_name}

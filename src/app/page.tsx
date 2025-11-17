@@ -15,6 +15,7 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [showSignupModal, setShowSignupModal] = useState(false)
   const [recentGloops, setRecentGloops] = useState<any[]>([])
+  const [pendingGloops, setPendingGloops] = useState<Record<string, number>>({})
 
   useEffect(() => {
     fetchUsers()
@@ -47,7 +48,43 @@ export default function Home() {
       .select('*')
       .order('gloop_count', { ascending: false })
     
-    if (data) setUsers(data)
+    if (data) {
+      // Merge with optimistic updates to prevent counts from going backwards
+      setUsers(prevUsers => {
+        return data.map(serverUser => {
+          const currentUser = prevUsers.find(u => u.id === serverUser.id)
+          const pending = pendingGloops[serverUser.id] || 0
+          
+          // If we have optimistic updates or the server count is higher, use the higher value
+          if (currentUser && pending > 0) {
+            return {
+              ...serverUser,
+              gloop_count: Math.max(serverUser.gloop_count, currentUser.gloop_count),
+              daily_gloop_count: Math.max(serverUser.daily_gloop_count, currentUser.daily_gloop_count)
+            }
+          }
+          
+          // Always use higher count to prevent regression
+          return currentUser ? {
+            ...serverUser,
+            gloop_count: Math.max(serverUser.gloop_count, currentUser.gloop_count),
+            daily_gloop_count: Math.max(serverUser.daily_gloop_count, currentUser.daily_gloop_count)
+          } : serverUser
+        })
+      })
+      
+      // Clear pending gloops that have been processed
+      setPendingGloops(prev => {
+        const updated = { ...prev }
+        Object.keys(updated).forEach(userId => {
+          const serverUser = data.find(u => u.id === userId)
+          if (serverUser && updated[userId] <= 0) {
+            delete updated[userId]
+          }
+        })
+        return updated
+      })
+    }
   }
 
   const checkCurrentUser = () => {
@@ -61,16 +98,15 @@ export default function Home() {
   }
 
   const updateUserOptimistically = (userId: string) => {
+    // Track pending gloop for this user
+    setPendingGloops(prev => ({
+      ...prev,
+      [userId]: (prev[userId] || 0) + 1
+    }))
+
     const user = users.find(u => u.id === userId)
     if (user) {
-      // Add to recent gloops
-      setRecentGloops(prev => {
-        const newRecents = [user, ...prev.filter(u => u.id !== userId)].slice(0, 10)
-        localStorage.setItem('recent-gloops', JSON.stringify(newRecents))
-        return newRecents
-      })
-      
-      // Update user count
+      // Update user count optimistically
       setUsers(prevUsers => 
         prevUsers.map(u => 
           u.id === userId 
@@ -82,6 +118,27 @@ export default function Home() {
             : u
         )
       )
+      
+      // Update current user if it's the same person
+      if (currentUser?.id === userId) {
+        setCurrentUser(prev => prev ? {
+          ...prev,
+          gloop_count: prev.gloop_count + 1,
+          daily_gloop_count: prev.daily_gloop_count + 1
+        } : null)
+      }
+
+      // Add to recent gloops after state update
+      setTimeout(() => {
+        const updatedUser = users.find(u => u.id === userId)
+        if (updatedUser) {
+          setRecentGloops(prev => {
+            const newRecents = [updatedUser, ...prev.filter(u => u.id !== userId)].slice(0, 10)
+            localStorage.setItem('recent-gloops', JSON.stringify(newRecents))
+            return newRecents
+          })
+        }
+      }, 0)
     }
   }
 
