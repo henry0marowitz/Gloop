@@ -253,7 +253,13 @@ export default function Home() {
             <>
               {/* User Profile - Takes up most space */}
               <div className="w-full sm:flex-1 order-2 sm:order-1">
-                <UserProfile user={currentUser} onSelfGloop={updateUserOptimistically} onActivateBoost={activateBoost} />
+                <UserProfile 
+                  user={currentUser} 
+                  onSelfGloop={updateUserOptimistically} 
+                  onActivateBoost={activateBoost}
+                  boostActive={boostActive}
+                  boostTimeLeft={boostTimeLeft}
+                />
               </div>
 
               {/* Invite Button - Smaller on right */}
@@ -282,17 +288,6 @@ export default function Home() {
             </>
           )}
         </div>
-        
-        {/* Boost Timer */}
-        {boostActive && (
-          <div className="fixed bottom-1/2 left-1/2 transform -translate-x-1/2 translate-y-1/2 bg-purple-600 text-white px-6 py-3 rounded-full shadow-lg z-50">
-            <div className="text-center">
-              <div className="text-2xl font-bold">🚀 BOOST ACTIVE</div>
-              <div className="text-lg">10x multiplier</div>
-              <div className="text-lg">{Math.floor(boostTimeLeft / 60)}:{(boostTimeLeft % 60).toString().padStart(2, '0')}</div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Signup Modal */}

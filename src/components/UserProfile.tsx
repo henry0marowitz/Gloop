@@ -15,9 +15,11 @@ interface UserProfileProps {
   user: User
   onSelfGloop: (userId: string) => void
   onActivateBoost?: () => void
+  boostActive?: boolean
+  boostTimeLeft?: number
 }
 
-export default function UserProfile({ user, onSelfGloop, onActivateBoost }: UserProfileProps) {
+export default function UserProfile({ user, onSelfGloop, onActivateBoost, boostActive, boostTimeLeft }: UserProfileProps) {
   return (
     <motion.div
       className="w-full text-left hover:bg-purple-50 px-6 py-6 rounded-lg transition-all border border-transparent hover:border-purple-200 shadow-sm hover:shadow-md cursor-pointer"
@@ -30,9 +32,16 @@ export default function UserProfile({ user, onSelfGloop, onActivateBoost }: User
     >
       <div className="flex items-center justify-between">
         <div className="text-left">
-          <h3 className="text-3xl font-bold text-purple-600 mb-2">
-            {user.first_name} {user.last_name}
-          </h3>
+          <div className="flex items-center gap-3 mb-2">
+            <h3 className="text-3xl font-bold text-purple-600">
+              {user.first_name} {user.last_name}
+            </h3>
+            {boostActive && boostTimeLeft && (
+              <div className="bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+                🚀 {Math.floor(boostTimeLeft / 60)}:{(boostTimeLeft % 60).toString().padStart(2, '0')}
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-4 text-base text-gray-600">
             <span>Gloops: <strong className="text-purple-600">{user.gloop_count}</strong></span>
             <span>Today: <strong className="text-purple-600">{user.daily_gloop_count}</strong></span>
