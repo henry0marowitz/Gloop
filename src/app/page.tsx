@@ -23,8 +23,8 @@ export default function Home() {
     fetchUsers()
     loadRecentGloops()
 
-    // Set up real-time updates every 5 seconds
-    const interval = setInterval(fetchUsers, 5000)
+    // Set up real-time updates every 10 seconds (reduced frequency to prevent conflicts)
+    const interval = setInterval(fetchUsers, 10000)
     
     return () => clearInterval(interval)
   }, [])
@@ -71,14 +71,13 @@ export default function Home() {
       .order('gloop_count', { ascending: false })
     
     if (data) {
-      // Merge with optimistic updates to prevent counts from going backwards
+      // NEVER allow counts to go backwards - always use the maximum value
       setUsers(prevUsers => {
         return data.map(serverUser => {
           const currentUser = prevUsers.find(u => u.id === serverUser.id)
-          const pending = pendingGloops[serverUser.id] || 0
           
-          // If we have optimistic updates or the server count is higher, use the higher value
-          if (currentUser && pending > 0) {
+          if (currentUser) {
+            // Always use the maximum between server and current displayed values
             return {
               ...serverUser,
               gloop_count: Math.max(serverUser.gloop_count, currentUser.gloop_count),
@@ -86,25 +85,9 @@ export default function Home() {
             }
           }
           
-          // Always use higher count to prevent regression
-          return currentUser ? {
-            ...serverUser,
-            gloop_count: Math.max(serverUser.gloop_count, currentUser.gloop_count),
-            daily_gloop_count: Math.max(serverUser.daily_gloop_count, currentUser.daily_gloop_count)
-          } : serverUser
+          // New user, use server data
+          return serverUser
         })
-      })
-      
-      // Clear pending gloops that have been processed
-      setPendingGloops(prev => {
-        const updated = { ...prev }
-        Object.keys(updated).forEach(userId => {
-          const serverUser = data.find(u => u.id === userId)
-          if (serverUser && updated[userId] <= 0) {
-            delete updated[userId]
-          }
-        })
-        return updated
       })
     }
   }
@@ -114,7 +97,18 @@ export default function Home() {
     if (userId && users.length > 0) {
       const user = users.find(u => u.id === userId)
       if (user) {
-        setCurrentUser(user)
+        // Only update current user if the new data is higher or it's the first time
+        setCurrentUser(prev => {
+          if (!prev || user.gloop_count >= prev.gloop_count) {
+            return user
+          }
+          // Keep the higher count if server data is lower
+          return {
+            ...user,
+            gloop_count: Math.max(user.gloop_count, prev.gloop_count),
+            daily_gloop_count: Math.max(user.daily_gloop_count, prev.daily_gloop_count)
+          }
+        })
       }
     }
   }
