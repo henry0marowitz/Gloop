@@ -8,21 +8,38 @@ import SearchUsers from '@/components/SearchUsers'
 import SignupModal from '@/components/SignupModal'
 import UserProfile from '@/components/UserProfile'
 import InviteButton from '@/components/InviteButton'
+import Recents from '@/components/Recents'
 
 export default function Home() {
   const [users, setUsers] = useState<any[]>([])
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [showSignupModal, setShowSignupModal] = useState(false)
+  const [recentGloops, setRecentGloops] = useState<any[]>([])
 
   useEffect(() => {
     fetchUsers()
-    checkCurrentUser()
+    loadRecentGloops()
 
     // Set up real-time updates every 5 seconds
     const interval = setInterval(fetchUsers, 5000)
     
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    checkCurrentUser()
+  }, [users])
+
+  const loadRecentGloops = () => {
+    try {
+      const saved = localStorage.getItem('recent-gloops')
+      if (saved) {
+        setRecentGloops(JSON.parse(saved))
+      }
+    } catch (error) {
+      console.error('Error loading recent gloops:', error)
+    }
+  }
 
   const fetchUsers = async () => {
     const { data } = await supabase
@@ -35,37 +52,55 @@ export default function Home() {
 
   const checkCurrentUser = () => {
     const userId = localStorage.getItem('gloop-user-id')
-    if (userId) {
+    if (userId && users.length > 0) {
       const user = users.find(u => u.id === userId)
-      setCurrentUser(user)
+      if (user) {
+        setCurrentUser(user)
+      }
     }
   }
 
   const updateUserOptimistically = (userId: string) => {
-    setUsers(prevUsers => 
-      prevUsers.map(user => 
-        user.id === userId 
-          ? { 
-              ...user, 
-              gloop_count: user.gloop_count + 1,
-              daily_gloop_count: user.daily_gloop_count + 1
-            }
-          : user
+    const user = users.find(u => u.id === userId)
+    if (user) {
+      // Add to recent gloops
+      setRecentGloops(prev => {
+        const newRecents = [user, ...prev.filter(u => u.id !== userId)].slice(0, 10)
+        localStorage.setItem('recent-gloops', JSON.stringify(newRecents))
+        return newRecents
+      })
+      
+      // Update user count
+      setUsers(prevUsers => 
+        prevUsers.map(u => 
+          u.id === userId 
+            ? { 
+                ...u, 
+                gloop_count: u.gloop_count + 1,
+                daily_gloop_count: u.daily_gloop_count + 1
+              }
+            : u
+        )
       )
-    )
+    }
   }
 
   return (
     <div className="min-h-screen bg-white text-black">
       {/* Header */}
       <header className="py-8 px-4">
-        <div className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-6">
-          <h1 className="text-6xl md:text-8xl font-bold text-purple-600">
-            Gloop
-          </h1>
-          <p className="text-xl md:text-3xl text-gray-700 text-center md:text-left">
-            Click on a name to give them a gloop!
-          </p>
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+          <div className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-6">
+            <h1 className="text-6xl md:text-8xl font-bold text-purple-600">
+              Gloop
+            </h1>
+            <p className="text-xl md:text-3xl text-gray-700 text-center md:text-left">
+              Click on a name to give them a gloop!
+            </p>
+          </div>
+          <div className="w-full lg:w-auto lg:min-w-[400px]">
+            <SearchUsers users={users} onUserClick={updateUserOptimistically} />
+          </div>
         </div>
       </header>
 
@@ -96,9 +131,9 @@ export default function Home() {
             />
           </div>
 
-          {/* Right Side - Search */}
+          {/* Right Side - Recents */}
           <div className="lg:order-none order-first lg:order-last">
-            <SearchUsers users={users} onUserClick={fetchUsers} />
+            <Recents recentGloops={recentGloops} onUserClick={updateUserOptimistically} />
           </div>
         </div>
       </main>
@@ -118,7 +153,7 @@ export default function Home() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                Sign up get gloops!
+                Sign up get Gloops!
               </motion.button>
             )}
           </div>

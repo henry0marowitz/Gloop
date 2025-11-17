@@ -69,16 +69,14 @@ export default function SearchUsers({ users, onUserClick }: SearchUsersProps) {
   }
 
   return (
-    <div className="bg-white border border-purple-200 rounded-lg p-6 shadow-sm">
-      <h2 className="text-2xl font-bold text-purple-600 mb-6">Search Users</h2>
-      
+    <div className="bg-white border border-purple-200 rounded-lg p-4 shadow-sm">
       <div className="mb-4">
         <input
           type="text"
           placeholder="Search for a name..."
           value={searchTerm}
           onChange={(e) => handleSearch(e.target.value)}
-          className="w-full px-4 py-3 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
         />
       </div>
 
