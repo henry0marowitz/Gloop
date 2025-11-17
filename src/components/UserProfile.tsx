@@ -19,9 +19,9 @@ interface UserProfileProps {
 
 export default function UserProfile({ user, onSelfGloop, onActivateBoost }: UserProfileProps) {
   return (
-    <motion.button
+    <motion.div
+      className="w-full text-left hover:bg-purple-50 px-6 py-6 rounded-lg transition-all border border-transparent hover:border-purple-200 shadow-sm hover:shadow-md cursor-pointer"
       onClick={() => onSelfGloop(user.id)}
-      className="w-full text-left hover:bg-purple-50 px-6 py-6 rounded-lg transition-all border border-transparent hover:border-purple-200 shadow-sm hover:shadow-md"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
@@ -63,6 +63,6 @@ export default function UserProfile({ user, onSelfGloop, onActivateBoost }: User
           </motion.span>
         </div>
       </div>
-    </motion.button>
+    </motion.div>
   )
 }
