@@ -89,10 +89,9 @@ export default function GlooperBoard({ title, users, type, onUserClick }: Gloope
                 </span>
                 <motion.button
                   onClick={() => handleGloopUser(user)}
-                  className={`text-left hover:bg-purple-50 px-3 py-2 rounded-lg transition-all border border-transparent hover:border-purple-200 shadow-sm hover:shadow-md ${clicking[user.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  whileHover={{ scale: clicking[user.id] ? 1 : 1.05 }}
-                  whileTap={{ scale: clicking[user.id] ? 1 : 0.95 }}
-                  disabled={clicking[user.id]}
+                  className="text-left hover:bg-purple-50 px-3 py-2 rounded-lg transition-all border border-transparent hover:border-purple-200 shadow-sm hover:shadow-md"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   <span className="font-medium text-gray-900">
                     {user.first_name} {user.last_name}
