@@ -208,7 +208,7 @@ export default function Home() {
       setBoostTimeLeft(60) // 60 seconds
       
       // Decrease boost count
-      setCurrentUser(prev => prev ? {
+      setCurrentUser((prev: any) => prev ? {
         ...prev,
         gloop_boosts: prev.gloop_boosts - 1
       } : null)
