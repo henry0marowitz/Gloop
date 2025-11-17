@@ -53,19 +53,30 @@ export default function SignupModal({ onClose, onSignup }: SignupModalProps) {
 
     try {
       if (isSignIn) {
-        // Sign in with email
-        const { data, error } = await supabase
+        // Sign in with email - try case-insensitive search
+        const { data: users, error } = await supabase
           .from('users')
           .select('*')
-          .eq('email', formData.email.trim().toLowerCase())
-          .single()
 
-        if (error || !data) {
+        if (error) {
+          console.error('Error fetching users:', error)
+          setErrors({ email: 'Error connecting to database' })
+          return
+        }
+
+        // Find user with case-insensitive email match
+        const user = users?.find(u => 
+          u.email.toLowerCase() === formData.email.trim().toLowerCase()
+        )
+
+        if (!user) {
+          console.log('Available emails:', users?.map(u => u.email))
+          console.log('Searching for:', formData.email.trim().toLowerCase())
           setErrors({ email: 'No account found with this email address' })
           return
         }
 
-        onSignup(data)
+        onSignup(user)
         onClose()
       } else {
         // Sign up new user
