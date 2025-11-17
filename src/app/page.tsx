@@ -98,7 +98,7 @@ export default function Home() {
       const user = users.find(u => u.id === userId)
       if (user) {
         // Only update current user if the new data is higher or it's the first time
-        setCurrentUser(prev => {
+        setCurrentUser((prev: any) => {
           if (!prev || user.gloop_count >= prev.gloop_count) {
             return user
           }
