@@ -34,6 +34,16 @@ export default function Home() {
   const [boostTimeLeft, setBoostTimeLeft] = useState(0)
   const usersRef = useRef<any[]>([])
   const todayEstString = getCurrentEstDateString()
+  const getBoostUsageKey = (userId: string) => `gloop-boost-usage-${userId}-${todayEstString}`
+  const getLocalBoostUsageValue = (userId: string) => {
+    if (typeof window === 'undefined') return 0
+    const stored = window.localStorage.getItem(getBoostUsageKey(userId))
+    return stored ? parseInt(stored, 10) : 0
+  }
+  const setLocalBoostUsageValue = (userId: string, value: number) => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(getBoostUsageKey(userId), value.toString())
+  }
 
   useEffect(() => {
     loadRecentGloops()
@@ -75,14 +85,28 @@ export default function Home() {
   }, [users])
 
 
+  const hasBoostTrackingFields = (user: any) => 
+    user && Object.prototype.hasOwnProperty.call(user, 'daily_boosts_used') && Object.prototype.hasOwnProperty.call(user, 'last_boost_reset')
+
   const getDailyBoostUsage = (user: any) => {
     if (!user) {
-      return { used: 0, needsReset: false }
+      return { used: 0, needsReset: false, usingLocal: true }
     }
-    const sameDay = isSameEstDay(user.last_boost_reset)
+
+    if (hasBoostTrackingFields(user)) {
+      const sameDay = isSameEstDay(user.last_boost_reset)
+      return {
+        used: sameDay ? user.daily_boosts_used || 0 : 0,
+        needsReset: !sameDay,
+        usingLocal: false
+      }
+    }
+
+    const localUsage = getLocalBoostUsageValue(user.id)
     return {
-      used: sameDay ? user.daily_boosts_used || 0 : 0,
-      needsReset: !sameDay
+      used: localUsage,
+      needsReset: false,
+      usingLocal: true
     }
   }
 
@@ -144,15 +168,17 @@ export default function Home() {
         })
       }
 
-      const boostResetDate = user.last_boost_reset ? getEstDateString(new Date(user.last_boost_reset)) : null
-      if (boostResetDate !== todayEst) {
-        const resetTimestamp = new Date().toISOString()
-        user.daily_boosts_used = 0
-        user.last_boost_reset = resetTimestamp
-        queueUpdate(user.id, {
-          daily_boosts_used: 0,
-          last_boost_reset: resetTimestamp
-        })
+      if (hasBoostTrackingFields(user)) {
+        const boostResetDate = user.last_boost_reset ? getEstDateString(new Date(user.last_boost_reset)) : null
+        if (boostResetDate !== todayEst) {
+          const resetTimestamp = new Date().toISOString()
+          user.daily_boosts_used = 0
+          user.last_boost_reset = resetTimestamp
+          queueUpdate(user.id, {
+            daily_boosts_used: 0,
+            last_boost_reset: resetTimestamp
+          })
+        }
       }
 
       serverMap.set(user.id, user)
@@ -274,52 +300,67 @@ export default function Home() {
   const activateBoost = async () => {
     if (!currentUser || currentUser.gloop_boosts <= 0) return
     
-    const { used: boostsUsedToday, needsReset } = getDailyBoostUsage(currentUser)
-    if (boostsUsedToday >= 5) {
+    const boostUsage = getDailyBoostUsage(currentUser)
+    if (boostUsage.used >= 5) {
       alert('You can only use 5 gloop boosts per day. Try again tomorrow!')
       return
     }
 
-    const nextDailyBoostsUsed = boostsUsedToday + 1
+    const nextDailyBoostsUsed = boostUsage.used + 1
     const newBoostBalance = Math.max(0, currentUser.gloop_boosts - 1)
     const nowIso = new Date().toISOString()
-    const nextBoostReset = needsReset ? nowIso : (currentUser.last_boost_reset || nowIso)
+    const nextBoostReset = boostUsage.needsReset ? nowIso : (currentUser?.last_boost_reset || nowIso)
     
     try {
       setBoostActive(true)
       setBoostTimeLeft(60) // 60 seconds
       
       // Update user state optimistically
-      setCurrentUser((prev: any) => prev ? {
-        ...prev,
-        gloop_boosts: newBoostBalance,
-        daily_boosts_used: nextDailyBoostsUsed,
-        last_boost_reset: nextBoostReset
-      } : null)
+      setCurrentUser((prev: any) => {
+        if (!prev) return prev
+        const updates: any = {
+          ...prev,
+          gloop_boosts: newBoostBalance
+        }
+        if (!boostUsage.usingLocal) {
+          updates.daily_boosts_used = nextDailyBoostsUsed
+          updates.last_boost_reset = nextBoostReset
+        }
+        return updates
+      })
 
       setUsers((prevUsers: any[]) => {
-        const updatedList = prevUsers.map(u => 
-          u.id === currentUser.id
-            ? {
-                ...u,
-                gloop_boosts: newBoostBalance,
-                daily_boosts_used: nextDailyBoostsUsed,
-                last_boost_reset: nextBoostReset
-              }
-            : u
-        )
+        const updatedList = prevUsers.map(u => {
+          if (u.id !== currentUser.id) return u
+          const updates: any = {
+            ...u,
+            gloop_boosts: newBoostBalance
+          }
+          if (!boostUsage.usingLocal) {
+            updates.daily_boosts_used = nextDailyBoostsUsed
+            updates.last_boost_reset = nextBoostReset
+          }
+          return updates
+        })
         usersRef.current = updatedList
         return updatedList
       })
-      
-      // Update in database
+
+      if (boostUsage.usingLocal) {
+        setLocalBoostUsageValue(currentUser.id, nextDailyBoostsUsed)
+      }
+
+      const updatePayload: Record<string, any> = {
+        gloop_boosts: newBoostBalance
+      }
+      if (!boostUsage.usingLocal) {
+        updatePayload.daily_boosts_used = nextDailyBoostsUsed
+        updatePayload.last_boost_reset = nextBoostReset
+      }
+
       await supabase
         .from('users')
-        .update({ 
-          gloop_boosts: newBoostBalance,
-          daily_boosts_used: nextDailyBoostsUsed,
-          last_boost_reset: nextBoostReset
-        })
+        .update(updatePayload)
         .eq('id', currentUser.id)
       
       await syncGloopCounts()
