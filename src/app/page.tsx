@@ -42,14 +42,14 @@ export default function Home() {
   const [boostTimeLeft, setBoostTimeLeft] = useState(0)
   const usersRef = useRef<any[]>([])
   
-  // Auto-fix corrupted localStorage data
+  // Auto-fix corrupted localStorage data v4
   useEffect(() => {
-    const fixVersion = localStorage.getItem('daily-fix-v3')
+    const fixVersion = localStorage.getItem('daily-fix-v4')
     if (!fixVersion) {
       // Only clear the recent gloops cache that might be corrupted
       localStorage.removeItem('recent-gloops')
-      localStorage.setItem('daily-fix-v3', 'done')
-      console.log('Cleared corrupted recent gloops cache')
+      localStorage.setItem('daily-fix-v4', 'done')
+      console.log('Cleared corrupted recent gloops cache v4')
     }
   }, [])
   const todayEstString = getEstDateStringAtResetBoundary(new Date())
