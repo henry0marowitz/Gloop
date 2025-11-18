@@ -42,22 +42,7 @@ export default function Home() {
   const [boostTimeLeft, setBoostTimeLeft] = useState(0)
   const usersRef = useRef<any[]>([])
   
-  // Force cache clear for daily count reset - remove this after a few days
-  useEffect(() => {
-    const cacheVersion = localStorage.getItem('gloop-cache-version')
-    if (cacheVersion !== '2.0') {
-      // Only clear specific gloop-related cache, not user login
-      const keysToRemove = []
-      for (let key in localStorage) {
-        if (key.startsWith('gloop-boost') || key === 'recent-gloops') {
-          keysToRemove.push(key)
-        }
-      }
-      keysToRemove.forEach(key => localStorage.removeItem(key))
-      localStorage.setItem('gloop-cache-version', '2.0')
-      console.log('Cache cleared for daily count fix')
-    }
-  }, [])
+  // Cache clear disabled - manual refresh needed
   const todayEstString = getEstDateStringAtResetBoundary(new Date())
   const getBoostUsageKey = (userId: string) => `gloop-boost-usage-${userId}-${todayEstString}`
   const getLocalBoostUsageValue = (userId: string) => {
@@ -186,9 +171,13 @@ export default function Home() {
 
     if (!data) return
     
-    // Force fix any corrupted daily counts from server data
+    // Force all daily counts to be reasonable values
     data.forEach(user => {
       if (user.daily_gloop_count === user.gloop_count && user.gloop_count > 0) {
+        user.daily_gloop_count = 0
+      }
+      // Ensure daily count is never higher than global
+      if (user.daily_gloop_count > user.gloop_count) {
         user.daily_gloop_count = 0
       }
     })
