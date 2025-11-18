@@ -41,6 +41,16 @@ export default function Home() {
   const [boostActive, setBoostActive] = useState(false)
   const [boostTimeLeft, setBoostTimeLeft] = useState(0)
   const usersRef = useRef<any[]>([])
+  
+  // Force cache clear for daily count reset - remove this after a few days
+  useEffect(() => {
+    const cacheVersion = localStorage.getItem('gloop-cache-version')
+    if (cacheVersion !== '2.0') {
+      localStorage.clear()
+      localStorage.setItem('gloop-cache-version', '2.0')
+      console.log('Cache cleared for daily count fix')
+    }
+  }, [])
   const todayEstString = getEstDateStringAtResetBoundary(new Date())
   const getBoostUsageKey = (userId: string) => `gloop-boost-usage-${userId}-${todayEstString}`
   const getLocalBoostUsageValue = (userId: string) => {
@@ -227,9 +237,12 @@ export default function Home() {
       const serverUser = serverMap.get(localUser.id)
 
       if (serverUser) {
+        // Don't push daily counts that equal global counts (cache corruption)
+        const localDailyIsSuspicious = localUser.daily_gloop_count === localUser.gloop_count && localUser.gloop_count > 0
+        
         const shouldPushToServer =
           localUser.gloop_count > serverUser.gloop_count ||
-          localUser.daily_gloop_count > serverUser.daily_gloop_count
+          (!localDailyIsSuspicious && localUser.daily_gloop_count > serverUser.daily_gloop_count)
 
         const serverFarAhead =
           localUser.gloop_count + 100 < serverUser.gloop_count ||
@@ -238,9 +251,12 @@ export default function Home() {
         if (shouldPushToServer) {
           queueUpdate(localUser.id, {
             gloop_count: localUser.gloop_count,
-            daily_gloop_count: localUser.daily_gloop_count
+            ...(localDailyIsSuspicious ? {} : { daily_gloop_count: localUser.daily_gloop_count })
           })
-          nextUsers.push(localUser)
+          nextUsers.push({
+            ...localUser,
+            daily_gloop_count: localDailyIsSuspicious ? (serverUser.daily_gloop_count || 0) : localUser.daily_gloop_count
+          })
         } else if (serverFarAhead) {
           nextUsers.push({
             ...localUser,
@@ -248,7 +264,10 @@ export default function Home() {
             daily_gloop_count: serverUser.daily_gloop_count || 0
           })
         } else {
-          nextUsers.push(localUser)
+          nextUsers.push({
+            ...localUser,
+            daily_gloop_count: localDailyIsSuspicious ? (serverUser.daily_gloop_count || 0) : localUser.daily_gloop_count
+          })
         }
 
         serverMap.delete(localUser.id)
