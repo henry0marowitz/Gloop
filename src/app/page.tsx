@@ -46,7 +46,14 @@ export default function Home() {
   useEffect(() => {
     const cacheVersion = localStorage.getItem('gloop-cache-version')
     if (cacheVersion !== '2.0') {
-      localStorage.clear()
+      // Only clear specific gloop-related cache, not user login
+      const keysToRemove = []
+      for (let key in localStorage) {
+        if (key.startsWith('gloop-boost') || key === 'recent-gloops') {
+          keysToRemove.push(key)
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key))
       localStorage.setItem('gloop-cache-version', '2.0')
       console.log('Cache cleared for daily count fix')
     }
