@@ -8,7 +8,7 @@ import SearchUsers from '@/components/SearchUsers'
 import SignupModal from '@/components/SignupModal'
 import UserProfile from '@/components/UserProfile'
 import InviteButton from '@/components/InviteButton'
-import Recents from '@/components/Recents'
+import GlobalChat from '@/components/GlobalChat'
 
 const estDateFormatter = new Intl.DateTimeFormat('en-US', {
   timeZone: 'America/New_York',
@@ -75,6 +75,17 @@ export default function Home() {
   }, [users])
 
 
+  const getDailyBoostUsage = (user: any) => {
+    if (!user) {
+      return { used: 0, needsReset: false }
+    }
+    const sameDay = isSameEstDay(user.last_boost_reset)
+    return {
+      used: sameDay ? user.daily_boosts_used || 0 : 0,
+      needsReset: !sameDay
+    }
+  }
+
   const loadRecentGloops = () => {
     try {
       const saved = localStorage.getItem('recent-gloops')
@@ -95,16 +106,35 @@ export default function Home() {
     if (!data) return
 
     const todayEst = getCurrentEstDateString()
-    const pendingUpdates = new Map<string, { id: string; gloop_count?: number; daily_gloop_count?: number; last_daily_reset?: string }>()
-    const queueUpdate = (id: string, fields: Partial<{ gloop_count: number; daily_gloop_count: number; last_daily_reset: string }>) => {
+    const pendingUpdates = new Map<
+      string,
+      {
+        id: string
+        gloop_count?: number
+        daily_gloop_count?: number
+        last_daily_reset?: string
+        daily_boosts_used?: number
+        last_boost_reset?: string
+      }
+    >()
+    const queueUpdate = (
+      id: string,
+      fields: Partial<{
+        gloop_count: number
+        daily_gloop_count: number
+        last_daily_reset: string
+        daily_boosts_used: number
+        last_boost_reset: string
+      }>
+    ) => {
       const existing = pendingUpdates.get(id) || { id }
       pendingUpdates.set(id, { ...existing, ...fields })
     }
 
     const serverMap = new Map<string, any>()
     data.forEach(user => {
-      const resetDate = user.last_daily_reset ? getEstDateString(new Date(user.last_daily_reset)) : null
-      if (resetDate !== todayEst) {
+      const dailyResetDate = user.last_daily_reset ? getEstDateString(new Date(user.last_daily_reset)) : null
+      if (dailyResetDate !== todayEst) {
         const resetTimestamp = new Date().toISOString()
         user.daily_gloop_count = 0
         user.last_daily_reset = resetTimestamp
@@ -113,6 +143,18 @@ export default function Home() {
           last_daily_reset: resetTimestamp
         })
       }
+
+      const boostResetDate = user.last_boost_reset ? getEstDateString(new Date(user.last_boost_reset)) : null
+      if (boostResetDate !== todayEst) {
+        const resetTimestamp = new Date().toISOString()
+        user.daily_boosts_used = 0
+        user.last_boost_reset = resetTimestamp
+        queueUpdate(user.id, {
+          daily_boosts_used: 0,
+          last_boost_reset: resetTimestamp
+        })
+      }
+
       serverMap.set(user.id, user)
     })
 
@@ -232,6 +274,17 @@ export default function Home() {
   const activateBoost = async () => {
     if (!currentUser || currentUser.gloop_boosts <= 0) return
     
+    const { used: boostsUsedToday, needsReset } = getDailyBoostUsage(currentUser)
+    if (boostsUsedToday >= 5) {
+      alert('You can only use 5 gloop boosts per day. Try again tomorrow!')
+      return
+    }
+
+    const nextDailyBoostsUsed = boostsUsedToday + 1
+    const newBoostBalance = Math.max(0, currentUser.gloop_boosts - 1)
+    const nowIso = new Date().toISOString()
+    const nextBoostReset = needsReset ? nowIso : (currentUser.last_boost_reset || nowIso)
+    
     try {
       setBoostActive(true)
       setBoostTimeLeft(60) // 60 seconds
@@ -239,14 +292,33 @@ export default function Home() {
       // Update user state optimistically
       setCurrentUser((prev: any) => prev ? {
         ...prev,
-        gloop_boosts: prev.gloop_boosts - 1
+        gloop_boosts: newBoostBalance,
+        daily_boosts_used: nextDailyBoostsUsed,
+        last_boost_reset: nextBoostReset
       } : null)
+
+      setUsers((prevUsers: any[]) => {
+        const updatedList = prevUsers.map(u => 
+          u.id === currentUser.id
+            ? {
+                ...u,
+                gloop_boosts: newBoostBalance,
+                daily_boosts_used: nextDailyBoostsUsed,
+                last_boost_reset: nextBoostReset
+              }
+            : u
+        )
+        usersRef.current = updatedList
+        return updatedList
+      })
       
       // Update in database
       await supabase
         .from('users')
         .update({ 
-          gloop_boosts: currentUser.gloop_boosts - 1
+          gloop_boosts: newBoostBalance,
+          daily_boosts_used: nextDailyBoostsUsed,
+          last_boost_reset: nextBoostReset
         })
         .eq('id', currentUser.id)
       
@@ -255,6 +327,9 @@ export default function Home() {
       console.error('Error activating boost:', error)
     }
   }
+
+  const currentUserBoostUsage = getDailyBoostUsage(currentUser)
+  const boostsLeftToday = currentUser ? Math.max(0, 5 - currentUserBoostUsage.used) : 0
 
   return (
     <div className={`h-screen flex flex-col bg-white text-black ${boostActive ? 'shadow-[0_0_50px_rgba(168,85,247,0.4)]' : ''}`}>
@@ -299,16 +374,9 @@ export default function Home() {
             />
           </div>
 
-          {/* Recents - Bottom on mobile */}
+          {/* Global Chat - Bottom on mobile */}
           <div className="mb-8">
-            <Recents 
-              recentGloops={recentGloops.map(recentUser => {
-                // Find the current data for this user to show updated counts
-                const currentUser = users.find(u => u.id === recentUser.id)
-                return currentUser || recentUser
-              })} 
-              onUserClick={updateUserOptimistically} 
-            />
+            <GlobalChat currentUser={currentUser} />
           </div>
         </div>
 
@@ -334,16 +402,9 @@ export default function Home() {
             />
           </div>
 
-          {/* Right Side - Recents */}
+          {/* Right Side - Global Chat */}
           <div>
-            <Recents 
-              recentGloops={recentGloops.map(recentUser => {
-                // Find the current data for this user to show updated counts
-                const currentUser = users.find(u => u.id === recentUser.id)
-                return currentUser || recentUser
-              })} 
-              onUserClick={updateUserOptimistically} 
-            />
+            <GlobalChat currentUser={currentUser} />
           </div>
         </div>
       </main>
@@ -362,6 +423,7 @@ export default function Home() {
                   onActivateBoost={activateBoost}
                   boostActive={boostActive}
                   boostTimeLeft={boostTimeLeft}
+                  boostsLeft={boostsLeftToday}
                 />
               </div>
 

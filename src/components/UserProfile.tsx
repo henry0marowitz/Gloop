@@ -21,9 +21,10 @@ interface UserProfileProps {
   onActivateBoost?: () => void
   boostActive?: boolean
   boostTimeLeft?: number
+  boostsLeft?: number
 }
 
-export default function UserProfile({ user, onSelfGloop, onActivateBoost, boostActive, boostTimeLeft }: UserProfileProps) {
+export default function UserProfile({ user, onSelfGloop, onActivateBoost, boostActive, boostTimeLeft, boostsLeft }: UserProfileProps) {
   const handleKeyHold = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Enter') {
       event.preventDefault()
@@ -69,11 +70,12 @@ export default function UserProfile({ user, onSelfGloop, onActivateBoost, boostA
                     onActivateBoost()
                   }
                 }}
-                className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium hover:bg-yellow-200 transition-colors cursor-pointer"
+                className={`bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium transition-colors cursor-pointer ${boostsLeft !== undefined && boostsLeft <= 0 ? 'opacity-60 cursor-not-allowed' : 'hover:bg-yellow-200'}`}
+                disabled={boostsLeft !== undefined && boostsLeft <= 0}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                {user.gloop_boosts} boosts available
+                {user.gloop_boosts} boosts ({boostsLeft !== undefined ? boostsLeft : '5+'} left today)
               </motion.button>
             )}
           </div>
