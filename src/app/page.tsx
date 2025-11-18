@@ -42,16 +42,7 @@ export default function Home() {
   const [boostTimeLeft, setBoostTimeLeft] = useState(0)
   const usersRef = useRef<any[]>([])
   
-  // Auto-fix corrupted localStorage data v4
-  useEffect(() => {
-    const fixVersion = localStorage.getItem('daily-fix-v4')
-    if (!fixVersion) {
-      // Only clear the recent gloops cache that might be corrupted
-      localStorage.removeItem('recent-gloops')
-      localStorage.setItem('daily-fix-v4', 'done')
-      console.log('Cleared corrupted recent gloops cache v4')
-    }
-  }, [])
+  // Cache clearing disabled
   const todayEstString = getEstDateStringAtResetBoundary(new Date())
   const getBoostUsageKey = (userId: string) => `gloop-boost-usage-${userId}-${todayEstString}`
   const getLocalBoostUsageValue = (userId: string) => {
@@ -209,16 +200,7 @@ export default function Home() {
 
     const serverMap = new Map<string, any>()
     data.forEach(user => {
-      const dailyResetDate = user.last_daily_reset ? new Date(user.last_daily_reset) : null
-      if (!isSameEstResetPeriod(user.last_daily_reset)) {
-        const resetTimestamp = new Date().toISOString()
-        user.daily_gloop_count = 0
-        user.last_daily_reset = resetTimestamp
-        queueUpdate(user.id, {
-          daily_gloop_count: 0,
-          last_daily_reset: resetTimestamp
-        })
-      }
+      // Daily reset disabled to prevent automatic zeroing
 
       if (hasBoostTrackingFields(user) && !isSameEstResetPeriod(user.last_boost_reset)) {
         const resetTimestamp = new Date().toISOString()
