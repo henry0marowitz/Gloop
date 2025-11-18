@@ -19,10 +19,18 @@ const estDateFormatter = new Intl.DateTimeFormat('en-US', {
 
 const getEstDateString = (date: Date) => estDateFormatter.format(date)
 const getCurrentEstDateString = () => getEstDateString(new Date())
-const isSameEstDay = (dateString?: string | null, comparisonDate?: string) => {
-  if (!dateString) return false
-  const target = comparisonDate ?? getCurrentEstDateString()
-  return getEstDateString(new Date(dateString)) === target
+
+const getEstDateStringAtResetBoundary = (date: Date) => {
+  const boundary = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+  boundary.setHours(boundary.getHours() - 2) // move to 2am EST boundary
+  return getEstDateString(boundary)
+}
+
+const isSameEstResetPeriod = (storedDate?: string | null) => {
+  if (!storedDate) return false
+  const currentBoundaryDate = getEstDateStringAtResetBoundary(new Date())
+  const storedBoundaryDate = getEstDateStringAtResetBoundary(new Date(storedDate))
+  return currentBoundaryDate === storedBoundaryDate
 }
 
 export default function Home() {
@@ -33,7 +41,7 @@ export default function Home() {
   const [boostActive, setBoostActive] = useState(false)
   const [boostTimeLeft, setBoostTimeLeft] = useState(0)
   const usersRef = useRef<any[]>([])
-  const todayEstString = getCurrentEstDateString()
+  const todayEstString = getEstDateStringAtResetBoundary(new Date())
   const getBoostUsageKey = (userId: string) => `gloop-boost-usage-${userId}-${todayEstString}`
   const getLocalBoostUsageValue = (userId: string) => {
     if (typeof window === 'undefined') return 0
@@ -54,6 +62,38 @@ export default function Home() {
     }, 5000)
     
     return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    const resetKey = 'gloop-daily-reset-20250114'
+    if (typeof window === 'undefined') return
+    if (window.localStorage.getItem(resetKey)) return
+
+    const forceReset = async () => {
+      try {
+        const resetTimestamp = new Date().toISOString()
+        await supabase
+          .from('users')
+          .update({
+            daily_gloop_count: 0,
+            last_daily_reset: resetTimestamp
+          })
+          .not('id', 'is', null)
+        window.localStorage.setItem(resetKey, 'done')
+        const { data } = await supabase
+          .from('users')
+          .select('*')
+          .order('gloop_count', { ascending: false })
+        if (data) {
+          setUsers(data)
+          usersRef.current = data
+        }
+      } catch (error) {
+        console.error('Error forcing daily reset:', error)
+      }
+    }
+
+    forceReset()
   }, [])
 
   useEffect(() => {
@@ -94,7 +134,7 @@ export default function Home() {
     }
 
     if (hasBoostTrackingFields(user)) {
-      const sameDay = isSameEstDay(user.last_boost_reset)
+      const sameDay = isSameEstResetPeriod(user.last_boost_reset)
       return {
         used: sameDay ? user.daily_boosts_used || 0 : 0,
         needsReset: !sameDay,
@@ -129,7 +169,6 @@ export default function Home() {
 
     if (!data) return
 
-    const todayEst = getCurrentEstDateString()
     const pendingUpdates = new Map<
       string,
       {
@@ -157,8 +196,8 @@ export default function Home() {
 
     const serverMap = new Map<string, any>()
     data.forEach(user => {
-      const dailyResetDate = user.last_daily_reset ? getEstDateString(new Date(user.last_daily_reset)) : null
-      if (dailyResetDate !== todayEst) {
+      const dailyResetDate = user.last_daily_reset ? new Date(user.last_daily_reset) : null
+      if (!isSameEstResetPeriod(user.last_daily_reset)) {
         const resetTimestamp = new Date().toISOString()
         user.daily_gloop_count = 0
         user.last_daily_reset = resetTimestamp
@@ -168,17 +207,14 @@ export default function Home() {
         })
       }
 
-      if (hasBoostTrackingFields(user)) {
-        const boostResetDate = user.last_boost_reset ? getEstDateString(new Date(user.last_boost_reset)) : null
-        if (boostResetDate !== todayEst) {
-          const resetTimestamp = new Date().toISOString()
-          user.daily_boosts_used = 0
-          user.last_boost_reset = resetTimestamp
-          queueUpdate(user.id, {
-            daily_boosts_used: 0,
-            last_boost_reset: resetTimestamp
-          })
-        }
+      if (hasBoostTrackingFields(user) && !isSameEstResetPeriod(user.last_boost_reset)) {
+        const resetTimestamp = new Date().toISOString()
+        user.daily_boosts_used = 0
+        user.last_boost_reset = resetTimestamp
+        queueUpdate(user.id, {
+          daily_boosts_used: 0,
+          last_boost_reset: resetTimestamp
+        })
       }
 
       serverMap.set(user.id, user)
@@ -259,7 +295,7 @@ export default function Home() {
     if (user) {
       const increment = boostActive ? 10 : 1
       let updatedUserSnapshot: any = null
-      
+
       // Update user count optimistically for instant UI feedback
       setUsers((prevUsers: any[]) => {
         const updatedList = prevUsers.map(u => {
@@ -409,7 +445,7 @@ export default function Home() {
           <div className="mb-8">
             <GlooperBoard 
               title="Daily Glooperboard" 
-              users={users.filter(u => isSameEstDay(u.last_daily_reset, todayEstString))} 
+              users={users.filter(u => isSameEstResetPeriod(u.last_daily_reset))} 
               type="daily"
               onUserClick={updateUserOptimistically}
             />
@@ -437,7 +473,7 @@ export default function Home() {
           <div>
             <GlooperBoard 
               title="Daily Glooperboard" 
-              users={users.filter(u => isSameEstDay(u.last_daily_reset, todayEstString))} 
+              users={users.filter(u => isSameEstResetPeriod(u.last_daily_reset))} 
               type="daily"
               onUserClick={updateUserOptimistically}
             />
