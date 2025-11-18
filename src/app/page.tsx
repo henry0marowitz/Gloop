@@ -10,26 +10,38 @@ import UserProfile from '@/components/UserProfile'
 import InviteButton from '@/components/InviteButton'
 import Recents from '@/components/Recents'
 
+const estDateFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+})
+
+const getEstDateString = (date: Date) => estDateFormatter.format(date)
+const getCurrentEstDateString = () => getEstDateString(new Date())
+const isSameEstDay = (dateString?: string | null, comparisonDate?: string) => {
+  if (!dateString) return false
+  const target = comparisonDate ?? getCurrentEstDateString()
+  return getEstDateString(new Date(dateString)) === target
+}
+
 export default function Home() {
   const [users, setUsers] = useState<any[]>([])
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [showSignupModal, setShowSignupModal] = useState(false)
   const [recentGloops, setRecentGloops] = useState<any[]>([])
-  const [pendingGloops, setPendingGloops] = useState<Record<string, number>>({})
   const [boostActive, setBoostActive] = useState(false)
   const [boostTimeLeft, setBoostTimeLeft] = useState(0)
-  const currentUserRef = useRef<any>(null)
-  const lastSyncedCountsRef = useRef<{ gloop_count: number; daily_gloop_count: number }>({
-    gloop_count: 0,
-    daily_gloop_count: 0
-  })
+  const usersRef = useRef<any[]>([])
+  const todayEstString = getCurrentEstDateString()
 
   useEffect(() => {
-    fetchUsers()
     loadRecentGloops()
+    syncGloopCounts()
 
-    // Set up real-time updates every 10 seconds (reduced frequency to prevent conflicts)
-    const interval = setInterval(fetchUsers, 10000)
+    const interval = setInterval(() => {
+      syncGloopCounts()
+    }, 5000)
     
     return () => clearInterval(interval)
   }, [])
@@ -59,50 +71,9 @@ export default function Home() {
   }, [users])
 
   useEffect(() => {
-    currentUserRef.current = currentUser
-  }, [currentUser])
+    usersRef.current = users
+  }, [users])
 
-  useEffect(() => {
-    if (currentUser?.id) {
-      lastSyncedCountsRef.current = {
-        gloop_count: currentUser.gloop_count,
-        daily_gloop_count: currentUser.daily_gloop_count
-      }
-    }
-  }, [currentUser?.id])
-
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const user = currentUserRef.current
-      if (!user) return
-
-      const lastSynced = lastSyncedCountsRef.current
-      const isInSync =
-        user.gloop_count === lastSynced.gloop_count &&
-        user.daily_gloop_count === lastSynced.daily_gloop_count
-
-      if (isInSync) return
-
-      try {
-        await supabase
-          .from('users')
-          .update({
-            gloop_count: user.gloop_count,
-            daily_gloop_count: user.daily_gloop_count
-          })
-          .eq('id', user.id)
-
-        lastSyncedCountsRef.current = {
-          gloop_count: user.gloop_count,
-          daily_gloop_count: user.daily_gloop_count
-        }
-      } catch (error) {
-        console.error('Error syncing current user counts:', error)
-      }
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }, [])
 
   const loadRecentGloops = () => {
     try {
@@ -115,31 +86,93 @@ export default function Home() {
     }
   }
 
-  const fetchUsers = async () => {
+  const syncGloopCounts = async () => {
     const { data } = await supabase
       .from('users')
       .select('*')
       .order('gloop_count', { ascending: false })
-    
-    if (data) {
-      // NEVER allow counts to go backwards - always use the maximum value
-      setUsers((prevUsers: any[]) => {
-        return data.map(serverUser => {
-          const currentUser = prevUsers.find(u => u.id === serverUser.id)
-          
-          if (currentUser) {
-            // Always use the maximum between server and current displayed values
-            return {
-              ...serverUser,
-              gloop_count: Math.max(serverUser.gloop_count, currentUser.gloop_count),
-              daily_gloop_count: Math.max(serverUser.daily_gloop_count, currentUser.daily_gloop_count)
-            }
-          }
-          
-          // New user, use server data
-          return serverUser
+
+    if (!data) return
+
+    const todayEst = getCurrentEstDateString()
+    const pendingUpdates = new Map<string, { id: string; gloop_count?: number; daily_gloop_count?: number; last_daily_reset?: string }>()
+    const queueUpdate = (id: string, fields: Partial<{ gloop_count: number; daily_gloop_count: number; last_daily_reset: string }>) => {
+      const existing = pendingUpdates.get(id) || { id }
+      pendingUpdates.set(id, { ...existing, ...fields })
+    }
+
+    const serverMap = new Map<string, any>()
+    data.forEach(user => {
+      const resetDate = user.last_daily_reset ? getEstDateString(new Date(user.last_daily_reset)) : null
+      if (resetDate !== todayEst) {
+        const resetTimestamp = new Date().toISOString()
+        user.daily_gloop_count = 0
+        user.last_daily_reset = resetTimestamp
+        queueUpdate(user.id, {
+          daily_gloop_count: 0,
+          last_daily_reset: resetTimestamp
         })
-      })
+      }
+      serverMap.set(user.id, user)
+    })
+
+    const localUsers = usersRef.current
+    const nextUsers: any[] = []
+
+    localUsers.forEach(localUser => {
+      const serverUser = serverMap.get(localUser.id)
+
+      if (serverUser) {
+        const shouldPushToServer =
+          localUser.gloop_count > serverUser.gloop_count ||
+          localUser.daily_gloop_count > serverUser.daily_gloop_count
+
+        const serverFarAhead =
+          localUser.gloop_count + 100 < serverUser.gloop_count ||
+          localUser.daily_gloop_count + 100 < serverUser.daily_gloop_count
+
+        if (shouldPushToServer) {
+          queueUpdate(localUser.id, {
+            gloop_count: localUser.gloop_count,
+            daily_gloop_count: localUser.daily_gloop_count
+          })
+          nextUsers.push(localUser)
+        } else if (serverFarAhead) {
+          nextUsers.push({
+            ...localUser,
+            gloop_count: serverUser.gloop_count,
+            daily_gloop_count: serverUser.daily_gloop_count
+          })
+        } else {
+          nextUsers.push(localUser)
+        }
+
+        serverMap.delete(localUser.id)
+      } else {
+        nextUsers.push(localUser)
+      }
+    })
+
+    serverMap.forEach(serverUser => {
+      nextUsers.push(serverUser)
+    })
+
+    nextUsers.sort((a, b) => b.gloop_count - a.gloop_count)
+    setUsers(nextUsers)
+    usersRef.current = nextUsers
+
+    const updatesToSend = Array.from(pendingUpdates.values())
+    if (updatesToSend.length > 0) {
+      await Promise.all(
+        updatesToSend.map(entry => {
+          const { id, ...rest } = entry
+          if (Object.keys(rest).length === 0) return Promise.resolve()
+          return supabase
+            .from('users')
+            .update(rest)
+            .eq('id', id)
+        })
+      )
     }
   }
 
@@ -148,39 +181,34 @@ export default function Home() {
     if (userId && users.length > 0) {
       const user = users.find(u => u.id === userId)
       if (user) {
-        // Only update current user if the new data is higher or it's the first time
-        setCurrentUser((prev: any) => {
-          if (!prev || user.gloop_count >= prev.gloop_count) {
-            return user
-          }
-          // Keep the higher count if server data is lower
-          return {
-            ...user,
-            gloop_count: Math.max(user.gloop_count, prev.gloop_count),
-            daily_gloop_count: Math.max(user.daily_gloop_count, prev.daily_gloop_count)
-          }
-        })
+        setCurrentUser(user)
       }
     }
   }
 
   const updateUserOptimistically = async (userId: string) => {
-    const user = users.find(u => u.id === userId)
+    const user = usersRef.current.find(u => u.id === userId)
     if (user) {
       const increment = boostActive ? 10 : 1
+      let updatedUserSnapshot: any = null
       
       // Update user count optimistically for instant UI feedback
-      setUsers((prevUsers: any[]) => 
-        prevUsers.map(u => 
-          u.id === userId 
-            ? { 
-                ...u, 
-                gloop_count: u.gloop_count + increment,
-                daily_gloop_count: u.daily_gloop_count + increment
-              }
-            : u
-        )
-      )
+      setUsers((prevUsers: any[]) => {
+        const updatedList = prevUsers.map(u => {
+          if (u.id === userId) {
+            const updatedUser = {
+              ...u,
+              gloop_count: u.gloop_count + increment,
+              daily_gloop_count: u.daily_gloop_count + increment
+            }
+            updatedUserSnapshot = updatedUser
+            return updatedUser
+          }
+          return u
+        })
+        usersRef.current = updatedList
+        return updatedList
+      })
       
       // Update current user if it's the same person
       if (currentUser?.id === userId) {
@@ -191,64 +219,12 @@ export default function Home() {
         } : null)
       }
 
-      // Add to recent gloops
-      setTimeout(() => {
-        const updatedUser = users.find(u => u.id === userId)
-        if (updatedUser) {
-          setRecentGloops(prev => {
-            const newRecents = [updatedUser, ...prev.filter(u => u.id !== userId)].slice(0, 10)
-            localStorage.setItem('recent-gloops', JSON.stringify(newRecents))
-            return newRecents
-          })
-        }
-      }, 0)
-
-      // Perform database operation
-      try {
-        let result
-        if (boostActive) {
-          result = await supabase.rpc('increment_user_gloop_boost', { user_id: userId })
-        } else {
-          result = await supabase.rpc('increment_user_gloop', { user_id: userId, increment_amount: 1 })
-        }
-
-        // If RPC functions don't exist, use fallback method
-        if (result.error) {
-          console.log('Using fallback method for database update')
-          // Insert gloop record
-          await supabase.from('gloops').insert({ user_id: userId })
-          
-          // Get current user data and update counts
-          const { data: currentUserData } = await supabase
-            .from('users')
-            .select('gloop_count, daily_gloop_count')
-            .eq('id', userId)
-            .single()
-          
-          if (currentUserData) {
-            await supabase
-              .from('users')
-              .update({
-                gloop_count: currentUserData.gloop_count + increment,
-                daily_gloop_count: currentUserData.daily_gloop_count + increment
-              })
-              .eq('id', userId)
-          }
-        }
-      } catch (error) {
-        console.error('Database error:', error)
-        // Revert optimistic update on error
-        setUsers((prevUsers: any[]) => 
-          prevUsers.map(u => 
-            u.id === userId 
-              ? { 
-                  ...u, 
-                  gloop_count: u.gloop_count - increment,
-                  daily_gloop_count: u.daily_gloop_count - increment
-                }
-              : u
-          )
-        )
+      if (updatedUserSnapshot) {
+        setRecentGloops(prev => {
+          const newRecents = [updatedUserSnapshot, ...prev.filter(u => u.id !== userId)].slice(0, 10)
+          localStorage.setItem('recent-gloops', JSON.stringify(newRecents))
+          return newRecents
+        })
       }
     }
   }
@@ -256,37 +232,25 @@ export default function Home() {
   const activateBoost = async () => {
     if (!currentUser || currentUser.gloop_boosts <= 0) return
     
-    // Check daily boost limit
-    const dailyBoostsUsed = currentUser.daily_boosts_used || 0
-    if (dailyBoostsUsed >= 10) {
-      alert('You have reached your daily boost limit of 10. Try again tomorrow!')
-      return
-    }
-    
     try {
-      // Reset daily boosts if needed
-      await supabase.rpc('reset_daily_boosts_if_needed', { user_id: currentUser.id })
-      
       setBoostActive(true)
       setBoostTimeLeft(60) // 60 seconds
       
       // Update user state optimistically
       setCurrentUser((prev: any) => prev ? {
         ...prev,
-        gloop_boosts: prev.gloop_boosts - 1,
-        daily_boosts_used: (prev.daily_boosts_used || 0) + 1
+        gloop_boosts: prev.gloop_boosts - 1
       } : null)
       
       // Update in database
       await supabase
         .from('users')
         .update({ 
-          gloop_boosts: currentUser.gloop_boosts - 1,
-          daily_boosts_used: dailyBoostsUsed + 1
+          gloop_boosts: currentUser.gloop_boosts - 1
         })
         .eq('id', currentUser.id)
       
-      fetchUsers()
+      await syncGloopCounts()
     } catch (error) {
       console.error('Error activating boost:', error)
     }
@@ -329,11 +293,7 @@ export default function Home() {
           <div className="mb-8">
             <GlooperBoard 
               title="Daily Glooperboard" 
-              users={users.filter(u => {
-                const today = new Date()
-                const lastReset = new Date(u.last_daily_reset)
-                return today.toDateString() === lastReset.toDateString()
-              })} 
+              users={users.filter(u => isSameEstDay(u.last_daily_reset, todayEstString))} 
               type="daily"
               onUserClick={updateUserOptimistically}
             />
@@ -368,11 +328,7 @@ export default function Home() {
           <div>
             <GlooperBoard 
               title="Daily Glooperboard" 
-              users={users.filter(u => {
-                const today = new Date()
-                const lastReset = new Date(u.last_daily_reset)
-                return today.toDateString() === lastReset.toDateString()
-              })} 
+              users={users.filter(u => isSameEstDay(u.last_daily_reset, todayEstString))} 
               type="daily"
               onUserClick={updateUserOptimistically}
             />
@@ -445,7 +401,7 @@ export default function Home() {
             onSignup={(user) => {
               setCurrentUser(user)
               localStorage.setItem('gloop-user-id', user.id)
-              fetchUsers()
+              syncGloopCounts()
             }}
           />
         )}
@@ -453,5 +409,3 @@ export default function Home() {
     </div>
   )
 }
-
-export const dynamic = 'force-dynamic'

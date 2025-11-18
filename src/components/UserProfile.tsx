@@ -73,7 +73,7 @@ export default function UserProfile({ user, onSelfGloop, onActivateBoost, boostA
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                {user.gloop_boosts} boosts ({10 - (user.daily_boosts_used || 0)} left today)
+                {user.gloop_boosts} boosts available
               </motion.button>
             )}
           </div>
