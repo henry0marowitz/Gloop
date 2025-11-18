@@ -42,7 +42,16 @@ export default function Home() {
   const [boostTimeLeft, setBoostTimeLeft] = useState(0)
   const usersRef = useRef<any[]>([])
   
-  // Cache clear disabled - manual refresh needed
+  // Auto-fix corrupted localStorage data
+  useEffect(() => {
+    const fixVersion = localStorage.getItem('daily-fix-v3')
+    if (!fixVersion) {
+      // Only clear the recent gloops cache that might be corrupted
+      localStorage.removeItem('recent-gloops')
+      localStorage.setItem('daily-fix-v3', 'done')
+      console.log('Cleared corrupted recent gloops cache')
+    }
+  }, [])
   const todayEstString = getEstDateStringAtResetBoundary(new Date())
   const getBoostUsageKey = (userId: string) => `gloop-boost-usage-${userId}-${todayEstString}`
   const getLocalBoostUsageValue = (userId: string) => {
