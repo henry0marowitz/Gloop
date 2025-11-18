@@ -178,6 +178,13 @@ export default function Home() {
       .order('gloop_count', { ascending: false })
 
     if (!data) return
+    
+    // Force fix any corrupted daily counts from server data
+    data.forEach(user => {
+      if (user.daily_gloop_count === user.gloop_count && user.gloop_count > 0) {
+        user.daily_gloop_count = 0
+      }
+    })
 
     const pendingUpdates = new Map<
       string,
