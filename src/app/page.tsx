@@ -182,7 +182,7 @@ export default function Home() {
     
     // Force all daily counts to be reasonable values
     data.forEach(user => {
-      if (user.daily_gloop_count === user.gloop_count && user.gloop_count > 0) {
+      if (user.daily_gloop_count === user.gloop_count && user.gloop_count > 10) {
         user.daily_gloop_count = 0
       }
       // Ensure daily count is never higher than global
@@ -249,8 +249,8 @@ export default function Home() {
       const serverUser = serverMap.get(localUser.id)
 
       if (serverUser) {
-        // Don't push daily counts that equal global counts (cache corruption)
-        const localDailyIsSuspicious = localUser.daily_gloop_count === localUser.gloop_count && localUser.gloop_count > 0
+        // Don't push daily counts that equal global counts when global is high (cache corruption)
+        const localDailyIsSuspicious = localUser.daily_gloop_count === localUser.gloop_count && localUser.gloop_count > 10
         
         const shouldPushToServer =
           localUser.gloop_count > serverUser.gloop_count ||
