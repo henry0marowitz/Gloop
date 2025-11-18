@@ -180,16 +180,7 @@ export default function Home() {
 
     if (!data) return
     
-    // Force all daily counts to be reasonable values
-    data.forEach(user => {
-      if (user.daily_gloop_count === user.gloop_count && user.gloop_count > 10) {
-        user.daily_gloop_count = 0
-      }
-      // Ensure daily count is never higher than global
-      if (user.daily_gloop_count > user.gloop_count) {
-        user.daily_gloop_count = 0
-      }
-    })
+    // No corruption detection - keep it simple
 
     const pendingUpdates = new Map<
       string,
@@ -249,12 +240,9 @@ export default function Home() {
       const serverUser = serverMap.get(localUser.id)
 
       if (serverUser) {
-        // Don't push daily counts that equal global counts when global is high (cache corruption)
-        const localDailyIsSuspicious = localUser.daily_gloop_count === localUser.gloop_count && localUser.gloop_count > 10
-        
         const shouldPushToServer =
           localUser.gloop_count > serverUser.gloop_count ||
-          (!localDailyIsSuspicious && localUser.daily_gloop_count > serverUser.daily_gloop_count)
+          localUser.daily_gloop_count > serverUser.daily_gloop_count
 
         const serverFarAhead =
           localUser.gloop_count + 100 < serverUser.gloop_count ||
@@ -263,12 +251,9 @@ export default function Home() {
         if (shouldPushToServer) {
           queueUpdate(localUser.id, {
             gloop_count: localUser.gloop_count,
-            ...(localDailyIsSuspicious ? {} : { daily_gloop_count: localUser.daily_gloop_count })
+            daily_gloop_count: localUser.daily_gloop_count
           })
-          nextUsers.push({
-            ...localUser,
-            daily_gloop_count: localDailyIsSuspicious ? (serverUser.daily_gloop_count || 0) : localUser.daily_gloop_count
-          })
+          nextUsers.push(localUser)
         } else if (serverFarAhead) {
           nextUsers.push({
             ...localUser,
@@ -276,10 +261,7 @@ export default function Home() {
             daily_gloop_count: serverUser.daily_gloop_count || 0
           })
         } else {
-          nextUsers.push({
-            ...localUser,
-            daily_gloop_count: localDailyIsSuspicious ? (serverUser.daily_gloop_count || 0) : localUser.daily_gloop_count
-          })
+          nextUsers.push(localUser)
         }
 
         serverMap.delete(localUser.id)
