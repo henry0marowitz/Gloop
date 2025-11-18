@@ -256,9 +256,10 @@ export default function Home() {
           localUser.daily_gloop_count + 100 < serverUser.daily_gloop_count
 
         if (shouldPushToServer) {
+          // TEMPORARILY DISABLE daily count syncing to allow manual reset
           queueUpdate(localUser.id, {
-            gloop_count: localUser.gloop_count,
-            ...(localDailyIsSuspicious ? {} : { daily_gloop_count: localUser.daily_gloop_count })
+            gloop_count: localUser.gloop_count
+            // daily_gloop_count sync disabled to fix corruption
           })
           nextUsers.push({
             ...localUser,
