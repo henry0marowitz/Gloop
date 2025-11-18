@@ -245,7 +245,7 @@ export default function Home() {
           nextUsers.push({
             ...localUser,
             gloop_count: serverUser.gloop_count,
-            daily_gloop_count: serverUser.daily_gloop_count
+            daily_gloop_count: serverUser.daily_gloop_count || 0
           })
         } else {
           nextUsers.push(localUser)
@@ -258,7 +258,10 @@ export default function Home() {
     })
 
     serverMap.forEach(serverUser => {
-      nextUsers.push(serverUser)
+      nextUsers.push({
+        ...serverUser,
+        daily_gloop_count: serverUser.daily_gloop_count || 0
+      })
     })
 
     nextUsers.sort((a, b) => b.gloop_count - a.gloop_count)
